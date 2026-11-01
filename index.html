@@ -1,0 +1,1820 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="分帳">
+  <meta name="theme-color" content="#404e62">
+  <title>分帳</title>
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <!-- Feather Icons -->
+  <script src="https://cdn.jsdelivr.net/npm/feather-icons@4.29.0/dist/feather.min.js"></script>
+  <!-- XLSX（匯入 / 匯入範本用；匯出有格式的 Excel 時另外載入 xlsx-js-style） -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+  :root{
+    --primary:#5887b3;--primary-light:#dce8f4;--primary-dark:#3d6494;
+    --accent:#74a19f;--accent2:#8db8b6;
+    --warm:#e2866b;--warm-light:#fae8e2;--warm-dark:#c0634e;
+    --success:#10b981;--warning:#d97706;--danger:#dc2626;--danger-light:#fee2e2;
+    --surface:#f6f5fa;--bg:#f2f1f8;
+    --border:#c4c6d5;--border-light:#dcdde8;
+    --text-primary:#1e293b;--text-secondary:#475569;--text-muted:#94a3b8;
+    --shadow-sm:0 1px 4px rgba(0,0,0,.07);--shadow-md:0 4px 16px rgba(0,0,0,.08);--shadow-lg:0 8px 32px rgba(0,0,0,.14);
+    --radius-sm:8px;--radius-md:14px;--radius-lg:20px;
+  }
+  *{font-family:'Noto Sans TC',sans-serif;-webkit-tap-highlight-color:transparent;box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 78px);min-height:100vh;color:var(--text-primary);font-size:14px}
+  .page{display:none;max-width:680px;margin:0 auto}
+  .page.active{display:block;animation:fade .25s}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .hidden{display:none!important}
+  button{font-family:'Noto Sans TC',sans-serif;cursor:pointer}
+  input,select,textarea{font-family:'Noto Sans TC',sans-serif;font-size:14px}
+
+  /* feather */
+  .fi{display:inline-block;vertical-align:-3px;flex-shrink:0}
+
+  /* ── HEADER ── */
+  .topbar{position:sticky;top:0;z-index:50;background:#404e62;color:#fff;padding:calc(env(safe-area-inset-top,0px) + 14px) 16px 14px;box-shadow:var(--shadow-md)}
+  .topbar-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;max-width:680px;margin:0 auto;min-height:48px}
+  .topbar-title{font-size:18px;font-weight:900;display:flex;align-items:center;gap:8px;min-width:0}
+  .topbar-title .tt-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .topbar-sub{font-size:11px;opacity:.85;margin-top:1px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sync-badge{font-size:10px;opacity:.7;white-space:nowrap;text-align:right;min-height:13px}
+  .me-btn{background:rgba(255,255,255,.2);border:none;color:#fff;padding:7px 13px;border-radius:999px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;white-space:nowrap}
+  .me-btn .me-dot{width:8px;height:8px;border-radius:50%;background:#b8d4ee}
+
+  /* ── NAV ── */
+  .nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:8px 4px calc(env(safe-area-inset-bottom,0px) + 8px);z-index:80;box-shadow:0 -2px 16px rgba(0,0,0,.05)}
+  .nav-item{flex:1;background:none;border:none;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0;color:#b0bbc8;transition:.15s}
+  .nav-item.active{color:var(--primary)}
+  .nav-item .ico{width:22px;height:22px;display:flex;align-items:center;justify-content:center}
+  .nav-item .lab{font-size:10px;font-weight:700}
+
+  /* ── GENERIC ── */
+  .wrap{padding:14px 14px 20px}
+  .sec-title{font-size:13px;font-weight:900;color:var(--text-secondary);margin:18px 4px 8px;display:flex;align-items:center;gap:6px}
+  .card{background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--border-light);box-shadow:var(--shadow-sm);margin-bottom:10px;overflow:hidden}
+  .btn{border:none;border-radius:var(--radius-sm);padding:11px 16px;font-size:14px;font-weight:700;background:var(--primary);color:#fff;transition:.15s;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+  .btn:active{transform:scale(.96)}
+  .btn.full{width:100%}
+  .btn.ghost{background:var(--primary-light);color:var(--primary-dark)}
+  .btn.gray{background:var(--border-light);color:var(--text-secondary)}
+  .btn.sm{padding:7px 12px;font-size:12px;border-radius:8px}
+  .btn.danger{background:var(--danger-light);color:var(--danger)}
+  .empty{text-align:center;color:var(--text-muted);padding:40px 20px;font-size:13px;font-weight:500}
+  .empty .big{font-size:40px;display:block;margin-bottom:10px}
+  .chip{padding:4px 11px;border-radius:999px;font-size:11px;font-weight:700;border:1.5px solid var(--border);background:var(--surface);color:#64748b;white-space:nowrap;transition:.15s;display:inline-flex;align-items:center;gap:4px}
+  .chip.on{background:#74a19f;color:#fff;border-color:#74a19f}
+  .pill{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700}
+  .tag-input{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text-primary);outline:none;transition:.15s;min-width:0;box-sizing:border-box}
+  .tag-input:focus{border-color:var(--primary);background:#fff}
+  input[type="date"].tag-input,input[type="time"].tag-input,input[type="number"].tag-input{-webkit-appearance:none;appearance:none}
+  label.fld{display:block;font-size:11px;font-weight:700;color:var(--text-muted);margin:10px 2px 5px}
+  textarea.tag-input{resize:vertical;min-height:60px}
+  .edit-info{font-size:10px;color:var(--text-muted);margin-top:4px}
+
+  /* ── tabs ── */
+  .tabs{display:flex;background:var(--border-light);border-radius:10px;padding:3px;margin-bottom:14px}
+  .tab-btn{flex:1;padding:8px 4px;border:none;border-radius:8px;background:none;font-weight:700;font-size:13px;color:var(--text-muted)}
+  .tab-btn.on{background:#fff;color:#74a19f;box-shadow:var(--shadow-sm)}
+
+  /* ── todo ── */
+  .todo-item{display:flex;gap:10px;align-items:flex-start;padding:11px 13px;border-bottom:1px solid var(--border-light)}
+  .todo-item:last-child{border-bottom:none}
+  .todo-cb{width:20px;height:20px;border-radius:6px;border:2px solid #cbd5e1;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:.15s;margin-top:1px;background:#fff;cursor:pointer}
+  .todo-cb.on{background:var(--success);border-color:var(--success)}
+  .todo-cb.on::after{content:'';width:4px;height:8px;border:2px solid #fff;border-top:none;border-left:none;transform:rotate(40deg) translateY(-1px)}
+  .todo-title{flex:1;font-size:14px;font-weight:700;line-height:1.4;word-break:break-word}
+  .todo-title.done{text-decoration:line-through;color:var(--text-muted)}
+  .due-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:#fef3c7;color:#92400e;white-space:nowrap}
+  .due-badge.over{background:var(--danger-light);color:var(--danger)}
+
+  /* ── memo ── */
+  .memo-item{display:flex;gap:9px;align-items:flex-start;padding:10px 12px;border-bottom:1px solid var(--border-light)}
+  .memo-item:last-child{border-bottom:none}
+  .cb{width:20px;height:20px;border-radius:6px;border:2px solid #cbd5e1;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:.15s;margin-top:1px;background:#fff;cursor:pointer}
+  .cb.on{background:var(--success);border-color:var(--success)}
+  .cb.on::after{content:'';width:4px;height:8px;border:2px solid #fff;border-top:none;border-left:none;transform:rotate(40deg) translateY(-1px)}
+  .memo-txt{flex:1;font-size:14px;line-height:1.5;word-break:break-word}
+  .memo-txt.done{text-decoration:line-through;color:var(--text-muted)}
+  /* ── memo rich editor ── */
+  .memo-fmt-bar{display:flex;gap:4px;margin-bottom:6px;}
+  .mfb{font-size:12px;padding:4px 9px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;gap:3px;font-family:inherit;}
+  .mfb.active{background:#e8f4f3;color:var(--primary);border-color:var(--primary);}
+  .memo-editor{min-height:120px;border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;line-height:1.75;color:var(--text-primary);background:var(--bg);outline:none;font-family:inherit;counter-reset:memo-num;word-break:break-word;-webkit-user-modify:read-write-plaintext-only;}
+  .memo-editor:focus{border-color:var(--primary);}
+  .me-line{min-height:1.75em;outline:none;position:relative;padding-left:0;}
+  .me-line[data-type="bullet"]{padding-left:14px;}
+  .me-line[data-type="bullet"]::before{content:"•";position:absolute;left:0;color:var(--text-secondary);}
+  .me-line[data-type="numbered"]{padding-left:22px;counter-increment:memo-num;}
+  .me-line[data-type="numbered"]::before{content:counter(memo-num)". ";position:absolute;left:0;color:var(--text-muted);}
+  .me-line[data-type="check"]{padding-left:20px;}
+  .me-line[data-type="check"]::before{content:"☐";position:absolute;left:0;color:var(--text-secondary);}
+  .me-line[data-type="check"].done::before{content:"☑";color:var(--success);}
+  .me-line[data-type="check"].done{color:var(--text-muted);text-decoration:line-through;}
+
+  /* ── modal ── */
+  .modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:200;display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px)}
+  .modal-bg.show{display:flex}
+  .modal{background:#fff;width:100%;max-width:680px;border-radius:22px 22px 0 0;padding:18px 18px calc(env(safe-area-inset-bottom,0px) + 18px);max-height:90vh;overflow-y:auto;animation:slideup .25s;position:relative;box-sizing:border-box}
+  @keyframes slideup{from{transform:translateY(100%)}to{transform:none}}
+  .modal-grip{width:40px;height:4px;background:var(--border);border-radius:999px;margin:0 auto 14px}
+  .modal-x{position:absolute;top:16px;right:16px;background:none;border:none;padding:4px;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;border-radius:6px;transition:.15s}
+  .modal-x:hover{background:var(--border-light);color:var(--text-primary)}
+  .modal-title{font-size:17px;font-weight:900;margin-bottom:4px;padding-right:32px}
+  .modal-acts{display:flex;gap:8px;margin-top:18px}
+  .seg{display:flex;gap:5px;background:var(--border-light);border-radius:10px;padding:4px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .seg::-webkit-scrollbar{display:none}
+  .seg button{flex:1;min-width:56px;white-space:nowrap;padding:8px 6px;border-radius:7px;border:none;background:none;font-size:12px;font-weight:700;color:var(--text-muted);display:flex;align-items:center;justify-content:center;gap:4px;flex-shrink:0}
+  .seg button.on{background:#fff;color:var(--primary);box-shadow:var(--shadow-sm)}
+
+  /* ── lock / role ── */
+  .lock{position:fixed;inset:0;background:var(--primary);z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;color:#fff;text-align:center}
+  .lock h1{font-size:26px;margin:0 0 6px;font-weight:900}
+  .lock p{opacity:.9;font-size:13px;margin:0 0 26px}
+  .role-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;width:100%;max-width:340px}
+  .role-btn{background:rgba(255,255,255,.16);border:1.5px solid rgba(255,255,255,.3);color:#fff;padding:16px 10px;border-radius:16px;font-size:15px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:6px}
+  .role-btn .rb-emoji{font-size:26px}
+  .role-add{background:rgba(255,255,255,.08);border:1.5px dashed rgba(255,255,255,.5)}
+
+  /* toast */
+  .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%);background:var(--text-primary);color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:700;z-index:900;opacity:0;transition:.25s;pointer-events:none;white-space:nowrap}
+  .toast.show{opacity:1;bottom:104px}
+  .fab{position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 90px);width:54px;height:54px;border-radius:50%;background:var(--primary);color:#fff;border:none;font-size:26px;box-shadow:var(--shadow-lg);z-index:70;display:flex;align-items:center;justify-content:center}
+  .fab:active{transform:scale(.92)}
+  .row-between{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .x-btn{background:none;border:none;font-size:20px;color:var(--text-muted);padding:4px;display:flex;align-items:center;cursor:pointer}
+  .dot-menu-btn{background:none;border:none;color:var(--text-muted);padding:2px 6px;font-weight:900;display:flex;align-items:center}
+
+  /* ── centered dialog ── */
+  .cdialog-bg{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:400;display:none;align-items:center;justify-content:center;padding:20px}
+  .cdialog-bg.show{display:flex}
+  .cdialog{background:var(--surface);border-radius:18px;padding:22px 18px;width:100%;max-width:340px;animation:fade .18s;box-shadow:var(--shadow-lg)}
+  .cdialog-title{font-size:15px;font-weight:900;margin-bottom:14px;color:var(--text-primary);line-height:1.4}
+
+  /* ── emoji picker ── */
+  .emoji-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:8px 0 4px}
+  .emoji-btn{font-size:26px;padding:8px 4px;border:2px solid transparent;border-radius:10px;background:var(--bg);cursor:pointer;transition:.12s;line-height:1;text-align:center}
+  .emoji-btn:hover{background:var(--primary-light);transform:scale(1.08)}
+  .emoji-btn.on{background:var(--primary-light);border-color:var(--primary)}
+  /* ── standardized due-tag ── */
+  .due-tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;background:#fef3c7;color:#92400e;white-space:nowrap}
+  .due-tag.over{background:var(--danger-light);color:var(--danger)}
+
+  /* ── 分帳 App 追加樣式 ── */
+  .topbar-title .tt-caret{opacity:.75;display:inline-flex}
+  .grp-btn{background:none;border:none;color:#fff;padding:0;text-align:left;min-width:0;max-width:100%;font-family:inherit;cursor:pointer}
+  .month-head{display:flex;align-items:baseline;justify-content:space-between;margin:18px 4px 2px;font-size:14px;font-weight:900;color:#7a4f2e}
+  .month-head span{font-size:11px;font-weight:700;color:var(--text-muted)}
+  .mnav{display:flex;align-items:center;justify-content:center;gap:8px;margin:4px 0 6px}
+  .marr{width:34px;height:34px;border-radius:50%;border:1px solid var(--border-light);background:var(--surface);color:var(--text-secondary);display:flex;align-items:center;justify-content:center}
+  .marr:disabled{opacity:.35}
+  .mlbl{font-size:15px;font-weight:900;padding:6px 14px;border-radius:999px;background:var(--surface);border:1px solid var(--border-light);display:inline-flex;align-items:center;gap:4px;cursor:pointer;min-width:132px;justify-content:center}
+  .mchips{display:flex;gap:6px;overflow-x:auto;padding:4px 2px 10px;scrollbar-width:none}
+  .mchips::-webkit-scrollbar{display:none}
+  .mchips .chip{cursor:pointer;font-size:12px;padding:5px 12px}
+  .trend{display:flex;align-items:flex-end;gap:8px;height:118px;padding:18px 4px 0}
+  .trend-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;cursor:pointer;min-width:0}
+  .trend-val{font-size:9.5px;color:var(--text-muted);font-weight:700;margin-bottom:3px;white-space:nowrap}
+  .trend-bar{width:70%;max-width:30px;border-radius:6px 6px 2px 2px;background:#c7d9d8;min-height:2px}
+  .trend-col.cur .trend-bar{background:#4e8a87}
+  .trend-col.cur .trend-val{color:#4e8a87}
+  .trend-lbl{font-size:10.5px;color:var(--text-muted);font-weight:700;margin-top:5px}
+  .trend-col.cur .trend-lbl{color:var(--text-primary)}
+  .note-row{border-bottom:1px solid var(--border-light)}
+  .note-row:last-child{border-bottom:none}
+  .note-pin{color:#c09060;display:inline-flex;margin-right:4px;vertical-align:-2px}
+  .note-preview{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+  .note-tools{display:flex;align-items:center;gap:6px}
+  .pill-btn{display:flex;align-items:center;gap:4px;background:transparent;border:1px solid var(--border-light);border-radius:20px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:700;color:var(--text-muted);font-family:inherit}
+  .pill-btn.on{background:var(--primary-light);border-color:var(--primary);color:var(--primary)}
+  .pill-btn.main{background:#4e8a87;border-color:#4e8a87;color:#fff}
+  .mem-chip{display:inline-flex;align-items:center;gap:5px;background:var(--bg);border:1.5px solid var(--border);border-radius:999px;padding:4px 12px;cursor:pointer;font-family:inherit}
+  .srow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border-light)}
+  .srow:last-child{border-bottom:none}
+  .srow .lbl{flex:1;min-width:0;font-size:13px;font-weight:700}
+  .srow .sub{font-size:11px;color:var(--text-muted);font-weight:400;margin-top:1px}
+  .grp-item{display:flex;align-items:center;gap:10px;padding:12px;border:1.5px solid var(--border-light);border-radius:12px;margin-bottom:8px;cursor:pointer;background:var(--surface)}
+  .grp-item.on{border-color:var(--primary);background:var(--primary-light)}
+  .me-line[data-type="check"]::before{cursor:pointer}
+  </style>
+</head>
+<body>
+
+  <div class="topbar" id="topbar">
+    <div class="topbar-row">
+      <div style="flex:1;min-width:0">
+        <button class="grp-btn" onclick="openGroupPicker()">
+          <div class="topbar-title"><span class="tt-name" id="tb-title">分帳</span><span class="tt-caret" id="tb-caret"></span></div>
+          <div class="topbar-sub" id="tb-sub">一起記帳、輕鬆結算</div>
+        </button>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+        <button class="me-btn" id="me-btn" onclick="openMePicker()"><span class="me-dot"></span><span id="me-name">我是…</span></button>
+        <div class="sync-badge" id="tb-sync"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page active"><div class="wrap" id="main"></div></div>
+
+  <button class="fab hidden" id="fab" onclick="sbOpenAddModal(null)"></button>
+  <div class="nav" id="nav"></div>
+  <div class="modal-bg" id="modal-bg"><div class="modal" id="modal"></div></div>
+  <div class="cdialog-bg" id="cdialog-bg" onclick="if(event.target===this)closeCDialog()"><div class="cdialog" id="cdialog"></div></div>
+  <div class="toast" id="toast"></div>
+
+<script>
+/* ════════════════════════════════════════════════════════════
+   分帳 App（獨立版）
+   - 分帳功能移植自旅遊 App 的分帳模式（細項、依金額分攤、多幣別、匯出 Excel 整理版）
+   - 統計頁可依月份切換（參考舊分帳 App）
+   - 總覽頁上方為「筆記」區（移植自旅遊 App 記事頁的備忘錄編輯器）
+   資料位置：舊分帳 App 同一個 Firebase 專案，但存放在 rooms/splitapp_{房間代碼}
+   （舊分帳 App 用的是 rooms/{房間代碼}，兩邊互不影響）
+   結構：groups/{群組id} = {name, currency, members:{id:{name,emoji,order}}, expenses:{...}, notes:{...}}
+   ════════════════════════════════════════════════════════════ */
+const firebaseConfig = {
+  apiKey: "AIzaSyCv7q6D7Dk8vLfIL8QhZKp_bMWnocZx-nw",
+  authDomain: "spilt-bill-1b05f.firebaseapp.com",
+  databaseURL: "https://spilt-bill-1b05f-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "spilt-bill-1b05f",
+  storageBucket: "spilt-bill-1b05f.firebasestorage.app",
+  messagingSenderId: "398384195111",
+  appId: "1:398384195111:web:c900a73da38a09e0999002",
+  measurementId: "G-ZWQYGL1L1F"
+};
+// 旅遊 App 的 Firebase（只用來「讀取」舊的分帳資料做匯入，不會寫入）
+const TRAVEL_CONFIG = {
+  apiKey: "AIzaSyAM9fK8cOIyyTuELrTi2b5yt0Nm-1SBZ8I",
+  authDomain: "travel-together-7168a.firebaseapp.com",
+  databaseURL: "https://travel-together-7168a-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "travel-together-7168a",
+  storageBucket: "travel-together-7168a.firebasestorage.app",
+  messagingSenderId: "789216457084",
+  appId: "1:789216457084:web:9386671702da5d18d434f9"
+};
+const TRAVEL_ROOT='rooms/travelapp_v2';
+const DEFAULT_ROOM='sindy-family';
+
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const esc=(s)=>(s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $=(id)=>document.getElementById(id);
+const safeKey=(s)=>String(s).replace(/[.#$\[\]\/\s]/g,'_');
+function lsGet(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:v; }catch(e){ return d; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+
+let ROOM=lsGet('sa_room',DEFAULT_ROOM)||DEFAULT_ROOM;
+const roomPath=()=>'rooms/splitapp_'+safeKey(ROOM);
+let db=null, _fbListening=false, LAST_SYNC=null, _badgeTimer=null;
+try{ const fbApp=firebase.initializeApp(firebaseConfig); db=firebase.database(fbApp); }catch(e){ console.warn('Firebase init failed',e); }
+const ref=(p='')=>db.ref(roomPath()+(p?'/'+p:''));
+
+let DATA={};
+let ACTIVE=lsGet('sa_group','');            // 目前群組 id
+let ME='';                                   // 目前群組中「我是誰」
+let SBTAB=lsGet('sa_tab','home');            // home / records / stats / settings
+let _myMembers={}; try{ _myMembers=JSON.parse(lsGet('sa_me','{}'))||{}; }catch(e){}
+let _seg={};
+let sbMonthFilter='';                        // 紀錄頁月份篩選（從統計頁帶過來）
+let STAT_M=null;                             // 統計頁月份：'YYYY-MM' 或 'all'
+const PERSON_EMOJIS=['😎','🧑','👧','👦','👩','👨','🧔','👩‍🦰','👵','👴','🦊','🐻','🐼','🐰','🦄','🐨','🐸','🐙','🐱','🐶','🦁','🐯','🐧','🐹'];
+
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1900); }
+function fi(name,sz=16){ try{ return window.feather.icons[name].toSvg({width:sz,height:sz,'stroke-width':1.8,class:'fi'}); }catch(e){ return ''; } }
+function logChange(){}                       // 旅遊 App 的修改紀錄功能，獨立版不使用
+
+/* ── 本機快取 + Firebase 寫入 ── */
+function loadData(){ try{ DATA=JSON.parse(lsGet('sa_data_'+safeKey(ROOM),'{}'))||{}; }catch(e){ DATA={}; } }
+function saveData(){ try{ localStorage.setItem('sa_data_'+safeKey(ROOM),JSON.stringify(DATA)); }catch(e){ toast('本機儲存失敗：空間不足'); } }
+function setDeep(obj,pathStr,val){
+  const parts=pathStr.split('/'); let cur=obj;
+  for(let i=0;i<parts.length-1;i++){ if(cur[parts[i]]==null||typeof cur[parts[i]]!=='object') cur[parts[i]]={}; cur=cur[parts[i]]; }
+  const last=parts[parts.length-1];
+  if(val===null||val===undefined) delete cur[last]; else cur[last]=val;
+}
+let _rt=null;
+function scheduleRender(){ clearTimeout(_rt); _rt=setTimeout(renderAll,0); }
+function clean(v){ return v===undefined?null:JSON.parse(JSON.stringify(v)); }   // Firebase 不接受 undefined
+function fbSet(path,val){ val=clean(val); setDeep(DATA,path,val); saveData(); scheduleRender(); if(db) ref(path).set(val).catch(e=>toast('雲端寫入失敗：'+e.message)); }
+function fbUpdate(path,updates){
+  updates=clean(updates);
+  const parts=path.split('/'); let nav=DATA;
+  for(const p of parts){ if(nav[p]==null||typeof nav[p]!=='object') nav[p]={}; nav=nav[p]; }
+  Object.keys(updates).forEach(k=>setDeep(nav,k,updates[k]));
+  saveData(); scheduleRender();
+  if(db) ref(path).update(updates).catch(e=>toast('雲端寫入失敗：'+e.message));
+}
+function fbRemove(path){ setDeep(DATA,path,null); saveData(); scheduleRender(); if(db) ref(path).remove().catch(()=>{}); }
+
+/* ── 同步 ── */
+function startSync(){
+  loadData(); renderAll();
+  if(!db){ updateSyncBadge(false); return; }
+  updateSyncBadge(false);
+  ref().once('value').then(snap=>{
+    const fb=snap.val();
+    const localHas=DATA.groups&&Object.keys(DATA.groups).length;
+    const fbHas=fb&&fb.groups&&Object.keys(fb.groups).length;
+    if(!fbHas&&localHas){ ref().set(DATA).then(()=>toast('本機資料已上傳雲端 ✓')).catch(()=>toast('上傳雲端失敗')); }
+    else if(fbHas){ DATA=fb; saveData(); renderAll(); }
+    subscribeFirebase();
+  }).catch(err=>{ console.warn(err); updateSyncBadge(false); subscribeFirebase(); });
+}
+function subscribeFirebase(){
+  if(_fbListening||!db) return; _fbListening=true;
+  ref().on('value',snap=>{
+    const d=snap.val();
+    if(d){ DATA=d; saveData(); }
+    LAST_SYNC=Date.now(); updateSyncBadge(true);
+    if(!$('modal-bg').classList.contains('show')) renderAll(); else _pendingRender=true;
+  },()=>{ _fbListening=false; updateSyncBadge(false); });
+}
+let _pendingRender=false;
+function switchRoom(code){
+  code=(code||'').trim(); if(!code){ toast('請輸入房間代碼'); return; }
+  if(db&&_fbListening){ ref().off(); _fbListening=false; }
+  ROOM=code; lsSet('sa_room',code); LAST_SYNC=null; ACTIVE=''; startSync(); toast('已連線到房間「'+code+'」');
+}
+function updateSyncBadge(ok){
+  const el=$('tb-sync'); if(!el) return;
+  if(ok&&LAST_SYNC){
+    const t=new Date(LAST_SYNC); const hh=String(t.getHours()).padStart(2,'0'), mm=String(t.getMinutes()).padStart(2,'0');
+    el.innerHTML=`<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:#b8d4ee;display:inline-block"></span>雲端同步 ${hh}:${mm}</span>`;
+  } else {
+    el.innerHTML=`<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:${db?'#fcd34d':'#94a3b8'};display:inline-block"></span>${db?'連線中…':'本機模式'}</span>`;
+  }
+}
+
+/* ── 群組 / 成員 ── */
+function groupsArr(){ const g=DATA.groups||{}; return Object.keys(g).map(k=>Object.assign({_id:k},g[k])).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)); }
+function sbData(){ return (ACTIVE&&DATA.groups&&DATA.groups[ACTIVE])||{currency:'NT$',expenses:{},members:{},notes:{}}; }
+function memberList(){ const m=sbData().members||{}; return Object.keys(m).map(k=>Object.assign({_id:k},m[k])).sort((a,b)=>(a.order||0)-(b.order||0)); }
+function sbMembers(){ return memberList().map(m=>m.name); }
+function sbAv(name){ const m=memberList().find(x=>x.name===name); return (m&&m.emoji)||'🙂'; }
+function ensureActive(){
+  const gs=groupsArr();
+  if(!gs.length){ ACTIVE=''; return; }
+  if(!ACTIVE||!DATA.groups[ACTIVE]){ ACTIVE=gs[0]._id; lsSet('sa_group',ACTIVE); }
+}
+function syncMe(){ ME=_myMembers[ACTIVE]||''; if(ME&&!sbMembers().includes(ME)) ME=''; }
+function setMe(name){ _myMembers[ACTIVE]=name; lsSet('sa_me',JSON.stringify(_myMembers)); ME=name; renderAll(); }
+function switchGroup(id){ ACTIVE=id; lsSet('sa_group',id); STAT_M=null; sbMonthFilter=''; sbCatFilter=''; sbSearchQ=''; closeModal(); renderAll(); window.scrollTo(0,0); }
+
+/* ════════════ 導覽 / Modal ════════════ */
+function modal(html){
+  $('modal').innerHTML=`<div class="modal-grip"></div><button class="modal-x" onclick="closeModal()" aria-label="關閉">${fi('x',18)}</button>`+html;
+  $('modal-bg').classList.add('show');
+}
+function closeModal(){ $('modal-bg').classList.remove('show'); _seg={}; if(_pendingRender){ _pendingRender=false; renderAll(); } }
+function appConfirm(msg,cb,okLabel){
+  const bg=$('cdialog-bg'),bx=$('cdialog');
+  bx.innerHTML=`<div class="cdialog-title" style="white-space:pre-line">${esc(msg)}</div>
+    <div class="modal-acts" style="margin-top:12px">
+      <button class="btn gray" onclick="closeCDialog()">取消</button>
+      <button class="btn ${okLabel?'':'danger'}" style="flex:1" onclick="_cdlgConfirm()">${esc(okLabel||'確認刪除')}</button>
+    </div>`;
+  bg.classList.add('show'); window._cdlgCb=cb;
+}
+function closeCDialog(){ $('cdialog-bg').classList.remove('show'); window._cdlgCb=null; }
+function _cdlgConfirm(){ const cb=window._cdlgCb; closeCDialog(); if(cb) cb(); }
+function segPick(group,v){ _seg[group]=v; document.querySelectorAll('#'+group+' button').forEach(b=>b.classList.toggle('on',b.dataset.v===v)); }
+function fmtTs(ts){ if(!ts)return''; const d=new Date(ts); return d.getFullYear()+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function fmtDateShort(d){ if(!d) return ''; const dt=new Date(d+'T00:00'); return (dt.getMonth()+1)+'/'+dt.getDate(); }
+function fmtYM(ym){ const [y,m]=String(ym).split('-'); return y+'年'+parseInt(m,10)+'月'; }
+function fmtDayLbl(d){ const dt=new Date(d+'T00:00:00'); if(isNaN(dt)) return d; return (dt.getMonth()+1)+'月'+dt.getDate()+'日（'+'日一二三四五六'[dt.getDay()]+'）'; }
+function sbMonthSum(ym){
+  const t={}; sbExpensesArr().filter(e=>e.type!=='settlement'&&(e.date||'').slice(0,7)===ym).forEach(e=>{ const c=sbExpCur(e); t[c]=(t[c]||0)+(e.amount||0); });
+  return Object.keys(t).map(c=>c+' '+Math.round(t[c]).toLocaleString()).join('　');
+}
+
+const TABS=[['home','home','總覽'],['records','list','紀錄'],['stats','pie-chart','統計'],['settings','settings','設定']];
+function sbGoTab(t){ SBTAB=t; lsSet('sa_tab',t); renderAll(); window.scrollTo(0,0); }
+
+function renderAll(){
+  ensureActive(); syncMe();
+  const g=ACTIVE?DATA.groups[ACTIVE]:null;
+  $('tb-title').textContent=g?(g.name||'未命名群組'):'分帳';
+  $('tb-caret').innerHTML=fi('chevron-down',16);
+  $('tb-sub').textContent=g?`${sbMembers().length} 位成員 · 預設幣別 ${sbCurrency()}`:'先建立一個分帳群組';
+  $('me-name').textContent=ME?(sbAv(ME)+' '+ME):'我是…';
+  $('me-btn').style.display=g?'':'none';
+  $('nav').innerHTML=TABS.map(([t,icon,lab])=>`<button class="nav-item${SBTAB===t?' active':''}" onclick="sbGoTab('${t}')"><span class="ico">${fi(icon,22)}</span><span class="lab">${lab}</span></button>`).join('');
+  $('nav').style.display=g?'':'none';
+  const f=$('fab'); f.innerHTML=fi('plus',24); f.classList.toggle('hidden',!(g&&(SBTAB==='home'||SBTAB==='records')));
+  let h='';
+  if(!g) h=renderWelcome();
+  else if(!sbMembers().length&&SBTAB!=='settings') h=`<div class="empty"><span class="big">👥</span>這個群組還沒有成員<br><button class="btn" style="margin-top:14px" onclick="sbGoTab('settings')">${fi('user-plus',14)} 到設定新增成員</button></div>`;
+  else if(SBTAB==='home') h=sbRenderHome();
+  else if(SBTAB==='records') h=sbRenderRecords();
+  else if(SBTAB==='stats') h=sbRenderStats();
+  else h=sbRenderSettings();
+  $('main').innerHTML=h;
+  if(SBTAB==='records'&&sbSearchQ){ const inp=$('sb-search-q'); if(inp){ inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length); } }
+  if(SBTAB==='home'&&_noteQ){ const inp=$('note-q'); if(inp){ inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length); } }
+}
+function renderWelcome(){
+  return `<div class="empty" style="padding-top:50px"><span class="big">💸</span>
+    <div style="font-size:16px;font-weight:900;color:var(--text-primary);margin-bottom:6px">歡迎使用分帳</div>
+    先建立一個分帳群組，或把旅遊 App 裡的分帳資料搬過來
+    <div style="display:flex;flex-direction:column;gap:10px;max-width:280px;margin:22px auto 0">
+      <button class="btn" onclick="openTravelImport()">${fi('download-cloud',15)} 從旅遊 App 匯入分帳</button>
+      <button class="btn ghost" onclick="editGroup(null)">${fi('plus',15)} 建立新群組</button>
+    </div>
+    <p style="font-size:11px;margin-top:22px">目前房間：${esc(ROOM)}</p>
+  </div>`;
+}
+
+/* ── 群組選擇 / 我是誰 ── */
+function openGroupPicker(){
+  const gs=groupsArr();
+  modal(`<div class="modal-title">${fi('layers',15)} 切換群組</div>
+    <p style="font-size:12px;color:var(--text-muted);margin:2px 0 12px">每個群組有自己的成員、支出與筆記</p>
+    ${gs.map(g=>{ const n=Object.values(g.expenses||{}).filter(e=>e.type!=='settlement').length; const mem=Object.values(g.members||{}).map(m=>m.emoji||'🙂').join('');
+      return `<div class="grp-item ${g._id===ACTIVE?'on':''}" onclick="switchGroup('${g._id}')">
+        <div style="flex:1;min-width:0"><div style="font-weight:900;font-size:14px">${esc(g.name||'未命名群組')}</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">${mem} · ${n} 筆支出</div></div>
+        ${g._id===ACTIVE?`<span style="color:var(--primary)">${fi('check',18)}</span>`:''}
+      </div>`; }).join('')||'<div class="empty" style="padding:16px">尚無群組</div>'}
+    <div class="modal-acts"><button class="btn ghost" style="flex:1" onclick="openTravelImport()">${fi('download-cloud',14)} 從旅遊 App 匯入</button><button class="btn" style="flex:1" onclick="editGroup(null)">${fi('plus',14)} 新群組</button></div>`);
+}
+function openMePicker(){
+  const ms=memberList();
+  if(!ms.length){ toast('請先到「設定」新增成員'); return; }
+  modal(`<div class="modal-title">${fi('user',15)} 我是誰？</div>
+    <p style="font-size:12px;color:var(--text-muted);margin:2px 0 12px">新增支出時會預設由你付款（只存在這台裝置）</p>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">${ms.map(m=>`<button onclick="setMe(${esc(JSON.stringify(m.name))});closeModal()" style="background:${m.name===ME?'var(--primary-light)':'var(--bg)'};border:1.5px solid ${m.name===ME?'var(--primary)':'var(--border-light)'};border-radius:12px;padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;font-family:inherit"><span style="font-size:26px">${m.emoji||'🙂'}</span><span style="font-size:13px;font-weight:700">${esc(m.name)}</span></button>`).join('')}</div>`);
+}
+function editGroup(id){
+  const g=id?DATA.groups[id]:{};
+  modal(`<div class="modal-title">${id?'編輯群組':'建立新群組'}</div>
+    <label class="fld">群組名稱</label><input class="tag-input" id="g-name" placeholder="例：家庭分帳、東京母女之旅" value="${esc(g.name||'')}">
+    <label class="fld">預設幣別</label><select class="tag-input" id="g-cur">${CURS.map(c=>`<option ${((g.currency)||'NT$')===c?'selected':''}>${c}</option>`).join('')}</select>
+    ${id?'':`<label class="fld">成員（用逗號或空白分隔，之後也可以在設定新增）</label><input class="tag-input" id="g-mem" placeholder="例：媽媽, Sindy">`}
+    <div class="modal-acts">${id?`<button class="btn danger" onclick="deleteGroup('${id}')">刪除群組</button>`:''}<button class="btn" style="flex:1" onclick="saveGroup('${id||''}')">儲存</button></div>`);
+  setTimeout(()=>$('g-name')?.focus(),60);
+}
+function saveGroup(id){
+  const name=$('g-name').value.trim(); if(!name){ toast('請輸入群組名稱'); return; }
+  const currency=$('g-cur').value;
+  if(id){ fbUpdate('groups/'+id,{name,currency}); closeModal(); toast('已更新群組'); return; }
+  const nid=uid(); const members={};
+  ($('g-mem').value||'').split(/[,，、\s]+/).map(s=>s.trim()).filter(Boolean).forEach((n,i)=>{ members[uid()+i]={name:n,emoji:PERSON_EMOJIS[i%PERSON_EMOJIS.length],order:i}; });
+  fbSet('groups/'+nid,{name,currency,members,createdAt:Date.now()});
+  closeModal(); switchGroup(nid); toast('已建立群組');
+}
+function deleteGroup(id){
+  const g=DATA.groups[id]; const n=Object.keys(g.expenses||{}).length;
+  appConfirm(`確定刪除群組「${g.name||''}」？\n裡面的 ${n} 筆紀錄和所有筆記都會一起刪除，無法復原。`,()=>{ fbRemove('groups/'+id); if(ACTIVE===id){ ACTIVE=''; lsSet('sa_group',''); } closeModal(); toast('已刪除群組'); });
+}
+const CURS=['NT$','$','¥','€','HK$','KRW','JPY','USD'];
+
+const SBCAT={
+  food:      {lbl:'吃喝',icon:'🍽',color:'#EA580C',bg:'#FFF7ED'},
+  shop:      {lbl:'購物',icon:'🛍',color:'#0D9488',bg:'#F0FDFA'},
+  fun:       {lbl:'娛樂',icon:'🎬',color:'#A855F7',bg:'#FAF5FF'},
+  transport: {lbl:'交通',icon:'🚗',color:'#2563EB',bg:'#EFF6FF'},
+  housing:   {lbl:'住宿',icon:'🏠',color:'#78716C',bg:'#FAFAF9'},
+  other:     {lbl:'其他',icon:'📦',color:'#94A3B8',bg:'#F8FAFC'},
+  settlement:{lbl:'轉帳',icon:'💸',color:'#7C3AED',bg:'#F5F3FF'},
+};
+const SBCAT_MAP={'雜貨':'food','外食':'food','餐飲':'food','食物':'food','吃喝':'food','酒水':'food','飲料':'food','娛樂':'fun','票券':'fun','交通':'transport','計程車':'transport','房屋':'housing','住宿':'housing','購物':'shop','帳單':'other','水電':'other','其他':'other'};
+function sbMapCat(s){ return SBCAT_MAP[(s||'').trim()]||'other'; }
+
+let sbSplitMode='equal', sbEditingId=null, sbAmtTouched=false;
+// 花費細項：sbItems=[{name,price,qty,among:[成員]}]；sbItemAdj=差額是否按比例分給大家；sbTotalAuto=總金額是否跟著細項合計
+let sbItems=[], sbItemAdj=false, sbTotalAuto=false;
+let sbSearchQ=''; let sbSearchOpen=false;
+let sbCatFilter=''; // 從統計頁點類別帶過來的紀錄篩選
+let sbPendingRows=[];
+let _sbShowSettled=false;
+
+function sbExpensesArr(){
+  const sb=sbData();
+  return Object.keys(sb.expenses||{}).map(k=>Object.assign({_id:k},sb.expenses[k])).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+}
+function sbCurrency(){ return sbData().currency||'NT$'; }
+function sbAvEl(name,sz){ sz=sz||38; return `<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:var(--bg);display:inline-flex;align-items:center;justify-content:center;font-size:${Math.round(sz*0.5)}px;flex-shrink:0;border:1.5px solid var(--border)">${sbAv(name)}</div>`; }
+function sbHasDiscrepancy(exp){ if(!exp||exp.type==='settlement'||!(exp.splitDetails||[]).length) return false; const sum=exp.splitDetails.reduce((s,d)=>s+(d.amount||0),0); return Math.abs(sum-exp.amount)>0.5; }
+
+/* ── 總渲染 ── */
+/* ── 結算計算（沿用原分帳邏輯） ── */
+function sbCalcBal(cur){
+  const exps=sbExpensesArr().filter(e=>!cur||sbExpCur(e)===cur);
+  const paid={},owed={};
+  const allNames=new Set(sbMembers());
+  exps.forEach(e=>{ allNames.add(e.payer); (e.splitAmong||[]).forEach(m=>allNames.add(m)); (e.paidDetails||[]).forEach(d=>allNames.add(d.name)); });
+  allNames.forEach(m=>{paid[m]=0;owed[m]=0;});
+  exps.forEach(exp=>{
+    if(exp.paidDetails&&exp.paidDetails.length){ exp.paidDetails.forEach(d=>{paid[d.name]=(paid[d.name]||0)+d.amount;}); }
+    else { paid[exp.payer]=(paid[exp.payer]||0)+exp.amount; }
+    (exp.splitDetails||[]).forEach(d=>{owed[d.name]=(owed[d.name]||0)+d.amount;});
+  });
+  const balances={}; allNames.forEach(m=>{balances[m]=(paid[m]||0)-(owed[m]||0);});
+  return {paid,owed,balances,allNames};
+}
+/* 取得某筆支出實際使用的幣別（沒填則回退到旅程預設幣別） */
+function sbExpCur(e){ return (e&&e.currency)||sbCurrency(); }
+/* 目前旅程分帳資料中實際出現過的所有幣別（至少會有一個，即使還沒有任何支出） */
+function sbAllCurrencies(){
+  const set=new Set(sbExpensesArr().map(sbExpCur));
+  if(!set.size) set.add(sbCurrency());
+  return [...set];
+}
+function sbSimplify(balances){
+  const pos=[],neg=[];
+  Object.entries(balances).forEach(([n,b])=>{if(b>0.01)pos.push({name:n,amount:b});else if(b<-0.01)neg.push({name:n,amount:-b});});
+  const txns=[];let i=0,j=0;
+  while(i<pos.length&&j<neg.length){const p=pos[i],n=neg[j],a=Math.min(p.amount,n.amount);txns.push({from:n.name,to:p.name,amount:a});p.amount-=a;n.amount-=a;if(p.amount<0.01)i++;if(n.amount<0.01)j++;}
+  return txns;
+}
+
+/* ── 總覽 ── */
+function sbRenderHome(){
+  let h=renderNotesSection();
+  // 每種幣別各自算一次餘額/簡化後的還款建議，再合併呈現成單一區塊（不依幣別拆成好幾組淨收付/債務關係）
+  const allCurs=sbAllCurrencies();
+  const perCur=allCurs.map(cur=>({cur,...sbCalcBal(cur)}));
+  const allNamesUnion=new Set(); perCur.forEach(pc=>pc.allNames.forEach(n=>allNamesUnion.add(n)));
+  const multiCur=allCurs.length>1;
+
+  // ── 淨收付：每人一列，把此人所有幣別的餘額疊在同一列右側（人多也不會重複出現）──
+  h+=`<div class="sec-title">${fi('trending-up',13)} 淨收付</div><div class="card" style="padding:6px 14px">`;
+  if(!allNamesUnion.size) h+=`<div class="empty" style="padding:20px 10px">尚無資料</div>`;
+  else h+=[...allNamesUnion].map(m=>{
+    const lines=perCur.map(pc=>{
+      const b=pc.balances[m]||0; if(Math.abs(b)<0.01) return '';
+      const cls=b>0.01?'var(--success)':'var(--danger)'; const sign=b>0.01?'+':'-';
+      return `<div style="font-size:13px;font-weight:900">
+        <span style="color:${cls}">${sign}${esc(pc.cur)} ${Math.round(Math.abs(b)).toLocaleString()}</span></div>`;
+    }).filter(Boolean);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border-light)">${sbAvEl(m)}<div style="flex:1;font-weight:700;font-size:14px">${esc(m)}</div><div style="text-align:right">${lines.length?lines.join(''):'<div style="font-size:12px;color:var(--text-muted)">－</div>'}</div></div>`;
+  }).join('');
+  h+=`</div>`;
+
+  // ── 債務關係：依幣別分組列出簡化後的還款建議（同一種幣別的轉帳收在一起，方便一次結清）──
+  h+=`<div class="sec-title">${fi('users',13)} 債務關係</div><div class="card" style="padding:8px 14px">`;
+  const groups=perCur.map(pc=>({cur:pc.cur,txns:sbSimplify(pc.balances)})).filter(g=>g.txns.length);
+  if(!groups.length) h+=`<div style="text-align:center;padding:14px 0;color:var(--success);font-weight:700">✓ 帳目已結清</div>`;
+  else h+=groups.map((g,gi)=>{
+    const tag=multiCur?`<div style="display:flex;align-items:center;gap:8px;margin:${gi?'14px':'2px'} 0 10px"><div style="flex:1;height:1.5px;background:#c09060;opacity:.3"></div><span style="font-size:11px;font-weight:800;color:#7a4f2e;letter-spacing:.08em;background:#ede0d0;padding:2px 10px;border-radius:999px">${esc(g.cur)}</span><div style="flex:1;height:1.5px;background:#c09060;opacity:.3"></div></div>`:'';
+    const rows=g.txns.map(t=>`<div style="padding:11px 0;border-bottom:1px solid var(--border-light)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:3px">${sbAvEl(t.from,40)}<span style="font-size:11px;font-weight:700">${esc(t.from)}</span></div>
+        <div style="flex:1;text-align:center"><div style="font-size:10px;color:var(--text-muted)">需要支付</div><div style="font-size:16px;font-weight:900;color:var(--primary)">${esc(g.cur)} ${Math.round(t.amount).toLocaleString()}</div></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:3px">${sbAvEl(t.to,40)}<span style="font-size:11px;font-weight:700">${esc(t.to)}</span></div>
+      </div>
+      <button class="btn sm ghost full" style="margin-top:8px" onclick="sbOpenSettle('${esc(t.from)}','${esc(t.to)}',${t.amount},'${esc(g.cur)}')">${fi('check',12)} 標記為已付款</button>
+    </div>`).join('');
+    return tag+rows;
+  }).join('');
+  // 已完成的付款紀錄：預設收起，不佔版面，展開才看得到「付過多少錢」的歷史紀錄
+  const settledList=sbExpensesArr().filter(e=>e.type==='settlement').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  if(settledList.length){
+    h+=`<div style="margin-top:${groups.length?'4px':'0'}">
+      <button type="button" onclick="_sbShowSettled=!_sbShowSettled;renderAll()" style="background:none;border:none;color:var(--text-muted);font-size:12px;font-weight:700;display:flex;align-items:center;gap:4px;cursor:pointer;padding:8px 2px;width:100%">
+        ${fi(_sbShowSettled?'chevron-down':'chevron-right',12)} 已完成的付款（${settledList.length}）
+      </button>
+      ${_sbShowSettled?settledList.map(s=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 2px;border-top:1px solid var(--border-light);font-size:12px">
+        <span style="font-weight:700">${esc(s.payer||'')}</span><span style="color:var(--text-muted)">→</span><span style="font-weight:700">${esc((s.splitDetails&&s.splitDetails[0]&&s.splitDetails[0].name)||'')}</span>
+        <span style="margin-left:auto;font-weight:700;color:var(--success)">${esc(sbExpCur(s))}${Math.round(s.amount||0).toLocaleString()}</span>
+        <span style="color:var(--text-muted);flex-shrink:0">${esc(s.date||'')}</span>
+      </div>`).join(''):''}
+    </div>`;
+  }
+  h+=`</div>`;
+  return h;
+}
+
+/* ── 紀錄 ── */
+function sbRenderRecords(){
+  let exps=sbExpensesArr();
+  if(sbSearchQ){ const q=sbSearchQ.toLowerCase(); exps=exps.filter(e=>(e.name||'').toLowerCase().includes(q)||(e.payer||'').toLowerCase().includes(q)); }
+  if(sbCatFilter) exps=exps.filter(e=>(SBCAT[e.cat]?e.cat:'other')===sbCatFilter);
+  if(sbMonthFilter) exps=exps.filter(e=>(e.date||'').slice(0,7)===sbMonthFilter);
+  exps.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const _sOpen=sbSearchOpen||!!sbSearchQ;
+  const _cf=sbCatFilter&&SBCAT[sbCatFilter];
+  let h=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:${_sOpen?'6px':'2px'}">
+    ${sbMonthFilter?`<button onclick="sbMonthFilter='';renderAll()" style="display:flex;align-items:center;gap:4px;background:var(--primary-light);border:1px solid var(--primary);border-radius:20px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:700;color:var(--primary-dark);font-family:inherit">${esc(fmtYM(sbMonthFilter))} ✕</button>`:''}
+    ${_cf?`<button onclick="sbCatFilter='';renderAll()" style="display:flex;align-items:center;gap:4px;background:${_cf.bg};border:1px solid ${_cf.color};border-radius:20px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:700;color:${_cf.color};font-family:inherit">${_cf.icon} ${_cf.lbl} ✕</button>`:''}
+    <button onclick="sbSearchOpen=!sbSearchOpen;if(!sbSearchOpen){sbSearchQ=''}renderAll()" style="display:flex;align-items:center;gap:4px;background:${_sOpen?'var(--primary-light)':'transparent'};border:1px solid ${_sOpen?'var(--primary)':'var(--border-light)'};border-radius:20px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:700;color:${_sOpen?'var(--primary)':'var(--text-muted)'};font-family:inherit">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      ${_sOpen?'收合搜尋':'搜尋'}
+    </button>
+    <button onclick="sbExportExcel()" style="display:flex;align-items:center;gap:4px;background:transparent;border:1px solid var(--border-light);border-radius:20px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:700;color:var(--text-muted);font-family:inherit;margin-left:auto">${fi('download',12)} 匯出 Excel</button>
+  </div>
+  ${_sOpen?`<div style="margin-bottom:10px"><input id="sb-search-q" class="tag-input" placeholder="搜尋品項、付款人…" value="${esc(sbSearchQ)}" oninput="if(event.isComposing)return;sbSearchQ=this.value;renderAll()" style="width:100%"></div>`:''}
+  `;
+  const disc=sbExpensesArr().filter(sbHasDiscrepancy);
+  if(disc.length){
+    h+=`<div style="background:#fef3c7;border:1px solid #fde68a;border-radius:12px;padding:11px 14px;margin-bottom:12px">
+      <div style="font-weight:900;font-size:13px;color:#92400e;margin-bottom:6px">${fi('alert-circle',13)} ${disc.length} 筆支出金額有差異，請確認</div>
+      ${disc.map(e=>{const diff=(e.splitDetails||[]).reduce((s,d)=>s+(d.amount||0),0)-e.amount;return `<div style="font-size:12px;color:#92400e;margin-bottom:2px;cursor:pointer" onclick="sbOpenAddModal('${e._id}')">• ${esc(e.date||'')} ${esc(e.name)}（差 ${diff>0?'+':''}${esc(sbExpCur(e))}${diff.toFixed(0)}）</div>`;}).join('')}
+    </div>`;
+  }
+  if(!exps.length){ h+=`<div class="empty"><span class="big">🧾</span>${(sbSearchQ||sbCatFilter||sbMonthFilter)?'找不到符合的記錄':'尚無支出記錄<br>點右下角 ＋ 新增第一筆'}</div>`; return h; }
+  const groups={};
+  exps.forEach(e=>{ (groups[e.date||'未分類']=groups[e.date||'未分類']||[]).push(e); });
+  let _lastYM='';
+  h+=Object.keys(groups).map(date=>{
+    const list=groups[date];
+    const ym=date.slice(0,7); const mHead=(ym!==_lastYM&&/^\d{4}-\d{2}$/.test(ym))?`<div class="month-head">${esc(fmtYM(ym))}<span>${esc(sbMonthSum(ym))}</span></div>`:''; _lastYM=ym;
+    const rows=list.map(exp=>{
+      const c=SBCAT[exp.cat]||SBCAT.other; const isS=exp.type==='settlement'; const ecur=sbExpCur(exp);
+      const warn=sbHasDiscrepancy(exp)?`<span style="position:absolute;top:-3px;right:-3px;width:14px;height:14px;border-radius:50%;background:#f59e0b;color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center">!</span>`:'';
+      return `<div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--border-light);cursor:pointer" onclick="sbOpenAddModal('${exp._id}')">
+        <div style="width:34px;height:34px;border-radius:9px;background:${c.bg};display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;position:relative">${c.icon}${warn}</div>
+        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;${isS?'color:var(--warm)':''}">${esc(exp.name)}</div><div style="font-size:11px;color:var(--text-muted);margin-top:1px">${c.lbl}${(exp.items&&exp.items.length)?' · 🧾 '+exp.items.length+' 項細項':''}${exp.notes?' · '+esc(exp.notes):''}</div></div>
+        <div style="text-align:right;flex-shrink:0"><div style="font-size:14px;font-weight:700">${esc(ecur)} ${(exp.amount||0).toLocaleString()}</div>${!isS?`<div style="font-size:11px;color:var(--text-muted);margin-top:1px">${esc(exp.payer||'')} 付款</div>`:''}</div>
+      </div>`;
+    }).join('');
+    return mHead+`<div style="font-size:12px;font-weight:700;color:var(--text-muted);margin:10px 2px 4px">${esc(fmtDayLbl(date))}</div><div class="card" style="padding:0 12px;background:#fff">${rows}</div>`;
+  }).join('');
+  return h;
+}
+
+/* ── 統計（各類別／各成員花費；轉帳不計入；不同幣別分開統計，因為沒有匯率無法合計） ── */
+function sbStatsGoCat(k){ sbCatFilter=k; sbMonthFilter=(STAT_M&&STAT_M!=='all')?STAT_M:''; sbSearchQ=''; sbSearchOpen=false; sbGoTab('records'); window.scrollTo(0,0); }
+
+/* ── 匯出分帳紀錄 Excel（有格式）──
+   app 內建的 SheetJS 社群版不支援儲存格樣式，按匯出時才另外載入 xlsx-js-style，
+   載入後立刻把全域 XLSX 還原成原本的版本，匯入功能完全不受影響。 */
+let _sbStyledXLSX=null;
+function sbLoadStyledXLSX(){
+  if(_sbStyledXLSX) return Promise.resolve(_sbStyledXLSX);
+  return new Promise(resolve=>{
+    const orig=window.XLSX;
+    const sc=document.createElement('script');
+    sc.src='https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js';
+    sc.onload=()=>{ _sbStyledXLSX=window.XLSX; window.XLSX=orig; resolve(_sbStyledXLSX); };
+    sc.onerror=()=>{ window.XLSX=orig; resolve(null); };
+    document.head.appendChild(sc);
+  });
+}
+// 匯出格式同「分帳紀錄（整理版）」：每天一列日期標題，主筆下方列出細項；另附「統計」工作表（公式只加總主筆）
+const SB_XSHEET='分帳紀錄';
+function sbBuildExport(X){
+  const exps=sbExpensesArr().filter(e=>e.type!=='settlement')
+    .sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.createdAt||0)-(b.createdAt||0));
+  const members=sbMembers().slice();
+  exps.forEach(e=>{ (e.splitDetails||[]).forEach(d=>{ if(d.name&&!members.includes(d.name)) members.push(d.name); }); (e.paidDetails||[]).forEach(d=>{ if(d.name&&!members.includes(d.name)) members.push(d.name); }); });
+  const r2=v=>Math.round((v||0)*100)/100;
+  const col=i=>X.utils.encode_col(i);
+  const NM=members.length, SPL0=9, CHK=SPL0+NM, NOTE=CHK+1, NC=NOTE+1;
+  const header=['編號','類型','日期','店家／花費','細項品項','類別','幣別','金額','誰付款',...members.map(m=>'分攤-'+m),'細項檢查','備註'];
+  const wk='日一二三四五六';
+  const ws={}; const kinds=[];                 // kinds[r]：每列的樣式種類
+  const put=(r,c,cell)=>{ ws[X.utils.encode_cell({r,c})]=cell; };
+  const S=v=>({t:'s',v:String(v)}), N=v=>({t:'n',v});
+  header.forEach((t,c)=>put(0,c,S(t))); kinds[0]='head';
+  let r=1, no=0, lastDate=null;
+  const mains=[];                              // 統計用：{cur,cat,amount,payer,paid:{},share:{}}
+  exps.forEach(e=>{
+    if(e.date&&e.date!==lastDate){
+      const d=new Date(e.date+'T00:00:00');
+      put(r,0,S(isNaN(d)?e.date:`${d.getMonth()+1}/${d.getDate()}（${wk[d.getDay()]}）`)); kinds[r]='day'; r++; lastDate=e.date;
+    }
+    no++;
+    const cur=sbExpCur(e), cat=(SBCAT[e.cat]||SBCAT.other).lbl;
+    const share={}; (e.splitDetails||[]).forEach(d=>{ share[d.name]=(share[d.name]||0)+(d.amount||0); });
+    const paid={}; if(e.paidDetails&&e.paidDetails.length) e.paidDetails.forEach(d=>{ paid[d.name]=(paid[d.name]||0)+(d.amount||0); }); else paid[e.payer]=(e.amount||0);
+    const multiPay=e.paidDetails&&e.paidDetails.length>1;
+    const payer=multiPay?e.paidDetails.map(d=>d.name+' '+Math.round(d.amount||0).toLocaleString()).join('、'):((e.paidDetails&&e.paidDetails[0]&&e.paidDetails[0].name)||e.payer||'');
+    const mr=r, R=mr+1;                        // R：Excel 列號（1-based）
+    mains.push({cur,cat,amount:e.amount||0,payer,multiPay,paid,share});
+    put(mr,0,S(no)); put(mr,1,S('主筆')); put(mr,2,S(e.date||'')); put(mr,3,S(e.name||'')); put(mr,5,S(cat)); put(mr,6,S(cur));
+    put(mr,7,N(r2(e.amount))); put(mr,8,S(payer));
+    members.forEach((m,mi)=>{ if(share[m]) put(mr,SPL0+mi,N(r2(share[m]))); });
+    const shareSum=Object.values(share).reduce((s,v)=>s+v,0);
+    const splitBad=Math.abs(shareSum-(e.amount||0))>1;
+    const splitRng=`${col(SPL0)}${R}:${col(CHK-1)}${R}`;
+    const items=e.items||[];
+    let notes=e.notes||'';
+    kinds[mr]='main'; r++;
+    if(!items.length){
+      put(mr,CHK,{t:'s',v:splitBad?'不符：分攤合計≠金額':'',f:`IF(ABS(SUM(${splitRng})-H${R})>1,"不符：分攤合計≠金額","")`});
+    } else {
+      const itemShare={};
+      items.forEach((it,ii)=>{
+        const sub=(it.price||0)*(it.qty||1); const who=(it.among&&it.among.length)?it.among:[];
+        put(r,0,S(no+'-'+(ii+1))); put(r,1,S('細項'));
+        [[2,'C'],[3,'D'],[5,'F'],[6,'G']].forEach(([c,L])=>{ const src=ws[X.utils.encode_cell({r:mr,c})]; put(r,c,{t:'s',v:src?src.v:'',f:`$${L}$${R}`}); });
+        put(r,4,S((it.name||'')+((it.qty||1)!==1?'*'+it.qty:'')));
+        who.forEach(m=>{ const mi=members.indexOf(m); if(mi<0) return; const v=sub/who.length; itemShare[m]=(itemShare[m]||0)+v; put(r,SPL0+mi,N(r2(v))); });
+        if((it.qty||1)!==1) put(r,NOTE,S('單價 '+(it.price||0).toLocaleString()+' × '+it.qty));
+        kinds[r]='item'; r++;
+      });
+      if(e.itemAdj){
+        const itemSum=Object.values(itemShare).reduce((s,v)=>s+v,0);
+        const d=(e.amount||0)-itemSum;
+        const txt=`相符（差額 ${d>0?'+':''}${Math.round(d).toLocaleString()} 按比例分攤）`;
+        put(mr,CHK,{t:'s',v:splitBad?'不符：分攤合計≠金額':txt,f:`IF(ABS(SUM(${splitRng})-H${R})>1,"不符：分攤合計≠金額","${txt}")`});
+      } else {
+        const a=R+1, b=R+items.length;
+        const terms=members.map((m,mi)=>`(ABS(SUM(${col(SPL0+mi)}${a}:${col(SPL0+mi)}${b})-N(${col(SPL0+mi)}${R}))>1)`).join('+');
+        const itemBad=members.some(m=>Math.abs((itemShare[m]||0)-(share[m]||0))>1);
+        put(mr,CHK,{t:'s',v:splitBad?'不符：分攤合計≠金額':(itemBad?'不符：細項分攤≠主筆':'相符'),f:`IF(ABS(SUM(${splitRng})-H${R})>1,"不符：分攤合計≠金額",IF((${terms})>0,"不符：細項分攤≠主筆","相符"))`});
+      }
+    }
+    if(notes) put(mr,NOTE,S(notes));
+  });
+  const last=r;                                // 最後一筆資料的 Excel 列號
+  const rng=c=>`$${c}$2:$${c}$${last}`;
+  const curs=[...new Set(mains.map(m=>m.cur))];
+  r++;                                         // 空一列
+  curs.forEach(c=>{
+    const ms=mains.filter(m=>m.cur===c);
+    put(r,3,S('合計（只算主筆）')); put(r,6,S(c));
+    put(r,7,{t:'n',v:r2(ms.reduce((s,m)=>s+m.amount,0)),f:`SUMIFS(${rng('H')},${rng('B')},"主筆",${rng('G')},"${c}")`});
+    members.forEach((m,mi)=>{ const L=col(SPL0+mi); put(r,SPL0+mi,{t:'n',v:r2(ms.reduce((s,x)=>s+(x.share[m]||0),0)),f:`SUMIFS(${rng(L)},${rng('B')},"主筆",${rng('G')},"${c}")`}); });
+    kinds[r]='total'; r++;
+  });
+  ws['!ref']=X.utils.encode_range({s:{r:0,c:0},e:{r:r-1,c:NC-1}});
+  ws['!autofilter']={ref:X.utils.encode_range({s:{r:0,c:0},e:{r:last-1,c:NC-1}})};
+  ws['!cols']=[7,6,12.5,34,32,6,6,10,8,...members.map(()=>11),20,50].map(w=>({wch:w}));
+  // 樣式（只有 xlsx-js-style 會寫出；一般 SheetJS 會忽略）
+  const bc={style:'thin',color:{rgb:'D5D9E0'}}; const border={top:bc,bottom:bc,left:bc,right:bc};
+  const font={name:'微軟正黑體',sz:11};
+  const isNum=c=>c===7||(c>=SPL0&&c<CHK);
+  for(let rr=0;rr<r;rr++){
+    const k=kinds[rr]; if(!k) continue;
+    for(let c=0;c<NC;c++){
+      const ref=X.utils.encode_cell({r:rr,c}); const cell=ws[ref]||(ws[ref]={t:'s',v:''});
+      if(isNum(c)&&cell.t==='n') cell.z='#,##0';
+      const al={vertical:'center',horizontal:(c<=1&&k!=='day')?'center':(isNum(c)?'right':'left'),wrapText:c===NOTE};
+      const nf=isNum(c)?{numFmt:'#,##0'}:{};
+      if(k==='head'||k==='total') cell.s={font:{...font,bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'4E8A87'}},alignment:{...al,horizontal:k==='head'?'center':al.horizontal},border,...nf};
+      else if(k==='day') cell.s={font:{...font,bold:true,color:{rgb:'8A5A2B'}},fill:{fgColor:{rgb:'F3E6D8'}},alignment:al,border};
+      else if(k==='main') cell.s={font:{...font,bold:[0,1,2,3,7,8].includes(c)},fill:{fgColor:{rgb:'E3EEEC'}},alignment:al,border,...nf};
+      else cell.s={font:{...font,sz:10,...([0,1,2,3,5,6].includes(c)?{color:{rgb:'9A9A9A'}}:{})},alignment:{...al,...(c===4?{indent:1}:{})},border,...nf};
+    }
+  }
+  ws['!rows']=[{hpt:22}];
+  const chkVals=[]; let itemCount=0;
+  for(let q=1;q<last;q++){ if(kinds[q]==='main'){ const x=ws[X.utils.encode_cell({r:q,c:CHK})]; chkVals.push(x?x.v:''); } if(kinds[q]==='item') itemCount++; }
+  return {ws,stats:sbBuildStatsSheet(X,{members,mains,curs,last,SPL0,CHK,chkVals,itemCount})};
+}
+function sbBuildStatsSheet(X,{members,mains,curs,last,SPL0,CHK,chkVals,itemCount}){
+  const ws={}; const st=[]; const col=i=>X.utils.encode_col(i); const r2=v=>Math.round((v||0)*100)/100;
+  const put=(r,c,cell)=>{ ws[X.utils.encode_cell({r,c})]=cell; };
+  const S=v=>({t:'s',v:String(v)});
+  const Q=`'${SB_XSHEET}'!`; const rg=L=>`${Q}$${L}$2:$${L}$${last}`;
+  const sumifs=(L,conds)=>`SUMIFS(${rg(L)},${rg('B')},"主筆"${conds.map(([cl,v])=>`,${rg(cl)},"${v}"`).join('')})`;
+  const sty=(r,kind,n)=>{ st.push([r,kind,n]); };
+  const NC=Math.max(6,members.length+3);
+  let r=0;
+  put(r,0,S('說明：所有統計只加總「主筆」列（細項不重複計算）；不同幣別分開統計，未換算匯率；已完成的轉帳不計入。')); sty(r,'note'); r+=2;
+  const catKeys=Object.keys(SBCAT).filter(k=>k!=='settlement'&&mains.some(m=>m.cat===SBCAT[k].lbl));
+  curs.forEach(c=>{
+    const ms=mains.filter(m=>m.cur===c);
+    put(r,0,S(`一、各類別花費（${c}）`)); sty(r,'title'); r++;
+    put(r,0,S('類別總額＝該類別所有主筆金額；後面是每人在該類別分攤到的金額')); sty(r,'note'); r++;
+    ['類別','總金額',...members.map(m=>m+' 分攤'),'筆數'].forEach((t,i)=>put(r,i,S(t))); sty(r,'head',members.length+3); r++;
+    const r0=r;
+    catKeys.forEach(k=>{
+      const lbl=SBCAT[k].lbl; const cm=ms.filter(m=>m.cat===lbl);
+      put(r,0,S(lbl));
+      put(r,1,{t:'n',v:r2(cm.reduce((s,m)=>s+m.amount,0)),f:sumifs('H',[['F',lbl],['G',c]])});
+      members.forEach((m,mi)=>put(r,2+mi,{t:'n',v:r2(cm.reduce((s,x)=>s+(x.share[m]||0),0)),f:sumifs(col(SPL0+mi),[['F',lbl],['G',c]])}));
+      put(r,2+members.length,{t:'n',v:cm.length,f:`COUNTIFS(${rg('B')},"主筆",${rg('F')},"${lbl}",${rg('G')},"${c}")`});
+      sty(r,'row',members.length+3); r++;
+    });
+    put(r,0,S('合計'));
+    for(let i=1;i<members.length+3;i++){ let v=0; for(let q=r0;q<r;q++){ const x=ws[X.utils.encode_cell({r:q,c:i})]; v+=x?x.v:0; } put(r,i,{t:'n',v:r2(v),f:`SUM(${col(i)}${r0+1}:${col(i)}${r})`}); }
+    sty(r,'sum',members.length+3); r+=2;
+  });
+  put(r,0,S('二、各成員花費與結算')); sty(r,'title'); r++;
+  put(r,0,S('分攤＝自己實際花掉的；代墊＝自己付錢的總額；淨額為正代表別人要還你，為負代表你要還別人')); sty(r,'note'); r++;
+  curs.forEach(c=>{
+    const ms=mains.filter(m=>m.cur===c);
+    [`成員（${c}）`,'自己的分攤','實際代墊','淨額（應收+／應付−）'].forEach((t,i)=>put(r,i,S(t))); sty(r,'head',4); r++;
+    const r0=r;
+    members.forEach((m,mi)=>{
+      const sh=ms.reduce((s,x)=>s+(x.share[m]||0),0);
+      const pd=ms.reduce((s,x)=>s+(x.paid[m]||0),0);
+      // 多人付款的支出無法用 SUMIFS 依付款人加總，直接加上該成員付的金額
+      const extra=r2(ms.filter(x=>x.multiPay).reduce((s,x)=>s+(x.paid[m]||0),0));
+      put(r,0,S(m));
+      put(r,1,{t:'n',v:r2(sh),f:sumifs(col(SPL0+mi),[['G',c]])});
+      put(r,2,{t:'n',v:r2(pd),f:sumifs('H',[['I',m],['G',c]])+(extra?'+'+extra:'')});
+      put(r,3,{t:'n',v:r2(pd-sh),f:`C${r+1}-B${r+1}`});
+      sty(r,'row',4); r++;
+    });
+    put(r,0,S('合計'));
+    for(let i=1;i<4;i++){ let v=0; for(let q=r0;q<r;q++) v+=ws[X.utils.encode_cell({r:q,c:i})].v; put(r,i,{t:'n',v:r2(v),f:`SUM(${col(i)}${r0+1}:${col(i)}${r})`}); }
+    sty(r,'sum',4); r+=2;
+  });
+  put(r,0,S('三、資料檢查')); sty(r,'title'); r++;
+  put(r,0,S('數字不為 0 時，請到「分帳紀錄」的「細項檢查」欄篩選「不符」查看')); sty(r,'note'); r++;
+  ['檢查項目','結果'].forEach((t,i)=>put(r,i,S(t))); sty(r,'head',2); r++;
+  const chkL=col(CHK);
+  curs.forEach(c=>{
+    const ms=mains.filter(m=>m.cur===c);
+    const v=ms.reduce((s,m)=>s+m.amount-Object.values(m.share).reduce((a,b)=>a+b,0),0);
+    put(r,0,S(`主筆金額合計 − 分攤合計（${c}）`));
+    put(r,1,{t:'n',v:r2(v),f:sumifs('H',[['G',c]])+members.map((m,mi)=>'-'+sumifs(col(SPL0+mi),[['G',c]])).join('')});
+    sty(r,'row',2); r++;
+  });
+  [['「分攤合計≠金額」筆數',`COUNTIF(${rg(chkL)},"不符：分攤*")`,'不符：分攤'],['「細項分攤≠主筆」筆數',`COUNTIF(${rg(chkL)},"不符：細項*")`,'不符：細項']].forEach(([t,f,pre])=>{ put(r,0,S(t)); put(r,1,{t:'n',v:chkVals.filter(v=>v.startsWith(pre)).length,f}); sty(r,'row',2); r++; });
+  put(r,0,S('主筆筆數 / 細項列數')); put(r,1,{t:'s',v:mains.length+' / '+itemCount,f:`COUNTIF(${rg('B')},"主筆")&" / "&COUNTIF(${rg('B')},"細項")`}); sty(r,'row',2); r++;
+  ws['!ref']=X.utils.encode_range({s:{r:0,c:0},e:{r:r-1,c:NC-1}});
+  ws['!cols']=[{wch:30},...Array(NC-1).fill({wch:14})];
+  const font={name:'微軟正黑體',sz:11}; const bc={style:'thin',color:{rgb:'D5D9E0'}}; const border={top:bc,bottom:bc,left:bc,right:bc};
+  st.forEach(([rr,kind,n])=>{
+    for(let c=0;c<(n||1);c++){
+      const ref=X.utils.encode_cell({r:rr,c}); const cell=ws[ref]||(ws[ref]={t:'s',v:''});
+      if(cell.t==='n') cell.z='#,##0';
+      const al={vertical:'center',horizontal:c===0?'left':'right'};
+      if(kind==='note') cell.s={font:{...font,sz:9,color:{rgb:'888888'}}};
+      else if(kind==='title') cell.s={font:{...font,sz:13,bold:true,color:{rgb:'4E8A87'}}};
+      else if(kind==='head') cell.s={font:{...font,bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'4E8A87'}},alignment:{vertical:'center',horizontal:'center'},border};
+      else if(kind==='sum') cell.s={font:{...font,bold:true},fill:{fgColor:{rgb:'E3EEEC'}},alignment:al,border,numFmt:'#,##0'};
+      else cell.s={font,alignment:al,border,numFmt:'#,##0'};
+    }
+  });
+  return ws;
+}
+async function sbExportExcel(){
+  if(!sbExpensesArr().some(e=>e.type!=='settlement')){ toast('尚無支出記錄可匯出'); return; }
+  toast('正在產生 Excel…');
+  const styled=await sbLoadStyledXLSX();
+  const X=styled||XLSX;
+  const {ws,stats}=sbBuildExport(X);
+  const wb=X.utils.book_new();
+  X.utils.book_append_sheet(wb,ws,SB_XSHEET);
+  X.utils.book_append_sheet(wb,stats,'統計');
+  const trip=DATA.groups[ACTIVE];
+  const date=new Date().toISOString().slice(0,10);
+  const filename=('分帳紀錄_'+(trip?trip.name:'group')+'_'+date+'.xlsx').replace(/[\\\/:*?"<>|]/g,'_');
+  X.writeFile(wb,filename);
+  toast(styled?'已匯出 Excel':'已匯出 Excel（樣式套件載入失敗，僅匯出資料）');
+}
+
+/* ── 設定 ── */
+function sbSaveCurrency(v){ fbSet('groups/'+ACTIVE+'/currency',v); toast('已更新幣別'); }
+function sbClearAll(){ appConfirm('確定清除此群組所有分帳紀錄？此操作無法復原。',()=>{ fbSet('groups/'+ACTIVE+'/expenses',null); toast('已清除'); }); }
+function sbExportData(){
+  const trip=DATA.groups[ACTIVE]; const sb=sbData();
+  const date=new Date().toISOString().slice(0,10);
+  const filename=('splitbill_'+(trip?trip.name:'group')+'_'+date+'.json').replace(/[^\w.\-一-鿿]/g,'_');
+  const blob=new Blob([JSON.stringify(sb,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  toast('已匯出');
+}
+function sbImportData(file){
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const d=JSON.parse(e.target.result);
+      if(!d||typeof d!=='object') throw new Error();
+      appConfirm('確定要用檔案覆蓋此群組目前的支出紀錄？（筆記會保留）',()=>{
+        const _add=membersFromExpenses(d.expenses||{},sbData().members||{}); const _upd={currency:d.currency||sbCurrency(),expenses:d.expenses||{}}; Object.keys(_add).forEach(k=>_upd['members/'+k]=_add[k]); fbUpdate('groups/'+ACTIVE,_upd);
+        toast('已匯入');
+      });
+    }catch(err){ toast('檔案格式錯誤'); }
+    const inp=$('sb-restore-input'); if(inp) inp.value='';
+  };
+  reader.readAsText(file);
+}
+
+/* ── 新增/編輯支出 ── */
+function sbOpenAddModal(idOrNull){
+  const members=sbMembers();
+  if(!members.length){ toast('請先到「設定」新增成員'); return; }
+  const exp=idOrNull?sbData().expenses[idOrNull]:null;
+  sbEditingId=idOrNull||null;
+  sbSplitMode=(exp&&exp.splitMode)||'equal';
+  sbItems=((exp&&exp.items)||[]).map(it=>({name:it.name||'',price:it.price||'',qty:it.qty||1,among:(it.among||[]).slice()}));
+  sbItemAdj=!!(exp&&exp.itemAdj); sbTotalAuto=false;
+  const cur=sbCurrency();
+  const defPayer=exp?exp.payer:(members.includes(ME)?ME:members[0]);
+  modal(`<div class="modal-title">${fi('dollar-sign',15)} ${idOrNull?'編輯支出':'新增支出'}</div>
+    <label class="fld">日期</label><input type="date" class="tag-input" id="sb-e-date" value="${esc((exp&&exp.date)||new Date().toISOString().slice(0,10))}">
+    <label class="fld">品項名稱</label><input class="tag-input" id="sb-e-name" placeholder="例：晚餐、計程車" value="${esc((exp&&exp.name)||'')}">
+    <div style="display:flex;gap:8px">
+      <div style="flex:1"><label class="fld">類別</label>
+        <select class="tag-input" id="sb-e-cat">${Object.keys(SBCAT).filter(k=>k!=='settlement').map(k=>`<option value="${k}" ${(exp&&exp.cat)===k?'selected':''}>${SBCAT[k].lbl}</option>`).join('')}</select></div>
+      <div style="flex:1"><label class="fld">金額</label>
+        <div style="display:flex;gap:6px">
+          <select class="tag-input" id="sb-e-cur" style="flex:0 0 66px;padding-left:6px;padding-right:2px" onchange="sbOnCurChange()">${['NT$','$','¥','€','HK$','KRW','JPY','USD'].map(c=>`<option value="${c}" ${(exp?exp.currency||sbCurrency():(localStorage.getItem('sb_last_cur')||sbCurrency()))===c?'selected':''}>${c}</option>`).join('')}</select>
+          <input type="number" class="tag-input" id="sb-e-amount" placeholder="0" min="0" value="${esc((exp&&exp.amount)||'')}" style="flex:1" oninput="sbTotalAuto=false;sbOnAmtChange()">
+        </div>
+      </div>
+    </div>
+    <label class="fld">付款人</label><select class="tag-input" id="sb-e-payer">${members.map(m=>`<option value="${esc(m)}" ${m===defPayer?'selected':''}>${esc(m)}</option>`).join('')}</select>
+    <label class="fld">分攤方式</label>
+    <div class="seg" id="sb-e-mode">
+      <button data-v="equal" class="${sbSplitMode==='equal'?'on':''}" onclick="sbSetSM('equal')">均分</button>
+      <button data-v="ratio" class="${sbSplitMode==='ratio'?'on':''}" onclick="sbSetSM('ratio')">依比例</button>
+      <button data-v="amount" class="${sbSplitMode==='amount'?'on':''}" onclick="sbSetSM('amount')">依金額</button>
+    </div>
+    <div id="sb-split-ui" style="margin-top:8px"></div>
+    <div id="sb-items-wrap" style="margin-top:12px;border:1.5px dashed var(--border);border-radius:10px;background:var(--bg)">
+      <button type="button" id="sb-items-head" onclick="sbToggleItems()" style="width:100%;display:flex;align-items:center;gap:6px;padding:10px 12px;background:none;border:none;font-family:inherit;font-size:12px;font-weight:700;color:var(--text-muted);cursor:pointer;text-align:left"></button>
+      <div id="sb-items-body" style="display:none;padding:0 10px 10px"></div>
+    </div>
+    <label class="fld" style="margin-top:10px">備註（選填）</label><input class="tag-input" id="sb-e-notes" value="${esc((exp&&exp.notes)||'')}">
+    <div class="modal-acts">${idOrNull?`<button class="btn danger" onclick="sbDeleteExpense()">刪除</button>`:''}<button class="btn" style="flex:1" onclick="sbSubmitExpense()">${idOrNull?'儲存修改':'確認新增'}</button></div>`);
+  setTimeout(()=>{ sbRenderSplitUI(exp); sbRenderItems(); if(sbItemsActive()) sbApplyItems(); },0);
+}
+function sbCurExpCurrency(){ return $('sb-e-cur')?.value||sbCurrency(); }
+function sbSetSM(mode){ if(sbItemsActive()&&mode!=='amount'){ toast('有細項時，分攤金額由細項自動計算'); return; } sbSplitMode=mode; document.querySelectorAll('#sb-e-mode button').forEach(b=>b.classList.toggle('on',b.dataset.v===mode)); sbRenderSplitUI(null); }
+function sbRenderSplitUI(exp){
+  const members=sbMembers();
+  const c=$('sb-split-ui'); if(!c) return;
+  if(sbSplitMode==='equal'){
+    const checked=(exp&&exp.splitAmong)||members;
+    c.innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:6px">${members.map(m=>`<button type="button" class="chip ${checked.includes(m)?'on':''}" data-m="${esc(m)}" onclick="event.preventDefault();this.classList.toggle('on');sbUpdEqHint()">${esc(m)}</button>`).join('')}</div><div style="font-size:11px;color:var(--text-muted);margin-top:6px" id="sb-split-hint"></div>`;
+    sbUpdEqHint();
+  } else if(sbSplitMode==='ratio'){
+    const total=(exp&&exp.amount)||0;
+    c.innerHTML=`<div style="display:flex;flex-direction:column;gap:6px">${members.map(m=>{
+      let pct=100/members.length;
+      if(exp&&exp.splitMode==='ratio'){const d=(exp.splitDetails||[]).find(x=>x.name===m); pct=(d&&total)?d.amount/total*100:0;}
+      return `<div style="display:flex;align-items:center;gap:8px"><span style="flex:0 0 62px;font-size:13px;font-weight:700">${esc(m)}</span><input type="number" class="tag-input sb-rinp" data-m="${esc(m)}" value="${pct.toFixed(1)}" min="0" max="100" style="flex:1" oninput="sbUpdRatioHint()"><span style="font-size:12px;color:var(--text-muted)">%</span></div>`;
+    }).join('')}</div><div style="font-size:11px;margin-top:6px" id="sb-split-hint"></div>`;
+    sbUpdRatioHint();
+  } else {
+    const total=parseFloat($('sb-e-amount')?.value)||0;
+    // 編輯「依金額」的舊紀錄時，分攤金額視為使用者已填過，之後改總金額不會覆蓋
+    sbAmtTouched=!!(exp&&exp.splitMode==='amount');
+    c.innerHTML=`<div style="display:flex;flex-direction:column;gap:6px">${members.map(m=>{
+      let amt=total/members.length;
+      if(exp&&exp.splitMode==='amount'){const d=(exp.splitDetails||[]).find(x=>x.name===m); amt=d?d.amount:0;}
+      return `<div style="display:flex;align-items:center;gap:8px"><span style="flex:0 0 62px;font-size:13px;font-weight:700">${esc(m)}</span><input type="number" class="tag-input sb-ainp" data-m="${esc(m)}" value="${amt.toFixed(0)}" min="0" style="flex:1" oninput="sbAmtTouched=true;sbUpdAmtHint()"><span class="sb-acur" style="font-size:12px;color:var(--text-muted)">${esc(sbCurExpCurrency())}</span></div>`;
+    }).join('')}</div><div style="font-size:11px;margin-top:6px" id="sb-split-hint"></div>`;
+    sbUpdAmtHint();
+  }
+}
+function sbOnAmtChange(){
+  if(sbSplitMode!=='amount'){ sbUpdItemsHint(); return; }
+  // 還沒手動填過分攤金額時才自動平均帶入；填過之後改總金額只更新差額提示，不清掉已填的金額
+  if(!sbAmtTouched){
+    const a=parseFloat($('sb-e-amount')?.value)||0;
+    const ins=document.querySelectorAll('.sb-ainp'); const each=ins.length?(a/ins.length).toFixed(0):0;
+    ins.forEach(i=>i.value=each);
+  }
+  if(sbItemsActive()){ sbApplyItems(); return; }
+  sbUpdAmtHint();
+}
+function sbOnCurChange(){
+  // 切換幣別只更新顯示，不重畫分攤欄位（避免已填的分攤金額被重設）
+  if(sbSplitMode==='amount'){ document.querySelectorAll('.sb-acur').forEach(e=>e.textContent=sbCurExpCurrency()); sbUpdAmtHint(); }
+  sbRenderItems();
+}
+/* ── 花費細項（預設收合；填了細項就自動算出「依金額」的分攤並鎖住） ── */
+function sbItemSub(it){ return (parseFloat(it.price)||0)*(parseFloat(it.qty)||0); }
+function sbValidItems(){ return sbItems.filter(it=>sbItemSub(it)>0); }
+function sbItemsActive(){ return sbValidItems().length>0; }
+function sbItemsSum(){ return sbValidItems().reduce((s,it)=>s+sbItemSub(it),0); }
+// 依細項算出每人分攤；sbItemAdj 時把「總額−細項合計」按比例分給大家（免稅、折扣）
+function sbItemShares(total){
+  const share={}; sbValidItems().forEach(it=>{ const who=it.among.length?it.among:[]; who.forEach(m=>{ share[m]=(share[m]||0)+sbItemSub(it)/who.length; }); });
+  const sum=Object.values(share).reduce((s,v)=>s+v,0);
+  if(sbItemAdj&&sum>0&&total>0) Object.keys(share).forEach(m=>share[m]=share[m]*total/sum);
+  return share;
+}
+function sbToggleItems(force){
+  const b=$('sb-items-body'); if(!b) return;
+  const open=force!=null?force:b.style.display==='none';
+  b.style.display=open?'block':'none';
+  if(open&&!sbItems.length) sbAddItem();
+  sbRenderItemsHead();
+}
+function sbRenderItemsHead(){
+  const h=$('sb-items-head'); if(!h) return;
+  const open=$('sb-items-body')?.style.display!=='none'; const n=sbValidItems().length; const cc=sbCurExpCurrency();
+  h.innerHTML=`${fi('list',13)} <span style="flex:1">花費細項（選填）${n?` · ${n} 項 ${esc(cc)}${Math.round(sbItemsSum()).toLocaleString()}`:''}</span><span style="font-size:11px">${open?'收合 ▴':'展開 ▾'}</span>`;
+}
+function sbRenderItems(){
+  const b=$('sb-items-body'); if(!b) return;
+  const members=sbMembers(); const cc=esc(sbCurExpCurrency());
+  b.innerHTML=sbItems.map((it,i)=>`<div style="background:#fff;border:1px solid var(--border-light);border-radius:9px;padding:8px;margin-bottom:8px">
+      <div style="display:flex;gap:6px;align-items:center">
+        <input class="tag-input" placeholder="品項，例：發熱衣" value="${esc(it.name)}" style="flex:1;padding:8px 10px" oninput="sbItems[${i}].name=this.value">
+        <button type="button" onclick="sbDelItem(${i})" aria-label="刪除細項" style="flex:0 0 auto;background:none;border:none;color:var(--text-muted);cursor:pointer;padding:4px">${fi('x',16)}</button>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;margin-top:6px;font-size:12px;color:var(--text-muted)">
+        <input type="number" class="tag-input" placeholder="單價" min="0" value="${esc(it.price)}" style="flex:1;padding:8px 10px" oninput="sbItems[${i}].price=this.value;sbOnItemChange(${i})">
+        <span>×</span>
+        <input type="number" class="tag-input" placeholder="數量" min="1" value="${esc(it.qty)}" style="flex:0 0 58px;padding:8px 6px" oninput="sbItems[${i}].qty=this.value;sbOnItemChange(${i})">
+        <span style="flex:0 0 auto;min-width:72px;text-align:right;font-weight:700;color:var(--text-primary)" id="sb-item-sub-${i}">= ${cc}${Math.round(sbItemSub(it)).toLocaleString()}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:7px">${members.map(m=>`<button type="button" class="chip ${it.among.includes(m)?'on':''}" onclick="event.preventDefault();sbToggleItemWho(${i},this)" data-m="${esc(m)}">${esc(m)}</button>`).join('')}<span style="font-size:10px;color:var(--text-muted);align-self:center">${it.among.length>1?'多人平分':''}</span></div>
+    </div>`).join('')
+    +`<button type="button" class="btn sm ghost" style="width:100%" onclick="sbAddItem()">${fi('plus',13)} 新增細項</button>
+    <div id="sb-items-hint" style="font-size:11px;margin-top:8px;line-height:1.7"></div>`;
+  sbRenderItemsHead(); sbUpdItemsHint();
+}
+function sbAddItem(){
+  const members=sbMembers(); const last=sbItems[sbItems.length-1];
+  const def=last&&last.among.length?last.among.slice():[members.includes(ME)?ME:members[0]];
+  if(!sbItemsActive()&&!(parseFloat($('sb-e-amount')?.value)>0)) sbTotalAuto=true;   // 總金額還沒填：先跟著細項合計
+  sbItems.push({name:'',price:'',qty:1,among:def}); sbRenderItems();
+  const ins=document.querySelectorAll('#sb-items-body input:not([type=number])'); ins[ins.length-1]?.focus();
+}
+function sbDelItem(i){ sbItems.splice(i,1); sbRenderItems(); sbApplyItems(); }
+function sbToggleItemWho(i,btn){
+  const it=sbItems[i], m=btn.dataset.m;
+  if(it.among.includes(m)){ if(it.among.length===1){ toast('每個細項至少要有一位分攤對象'); return; } it.among=it.among.filter(x=>x!==m); }
+  else it.among.push(m);
+  sbRenderItems(); sbApplyItems();
+}
+function sbOnItemChange(i){
+  const el=$('sb-item-sub-'+i); if(el) el.textContent='= '+sbCurExpCurrency()+Math.round(sbItemSub(sbItems[i])).toLocaleString();
+  sbRenderItemsHead(); sbApplyItems();
+}
+// 把細項結果帶入「依金額」分攤欄位並鎖住；沒有細項時解除鎖定
+function sbApplyItems(){
+  const active=sbItemsActive();
+  document.querySelectorAll('#sb-e-mode button').forEach(b=>{ b.style.opacity=active&&b.dataset.v!=='amount'?'.4':''; });
+  if(!active){ document.querySelectorAll('.sb-ainp').forEach(i=>{i.readOnly=false;i.style.background='';}); const n=$('sb-items-lock'); if(n) n.remove(); sbUpdItemsHint(); return; }
+  if(sbTotalAuto){ const a=$('sb-e-amount'); if(a) a.value=Math.round(sbItemsSum()*100)/100; }
+  if(sbSplitMode!=='amount') sbSetSM('amount');
+  const total=parseFloat($('sb-e-amount')?.value)||0; const share=sbItemShares(total);
+  document.querySelectorAll('.sb-ainp').forEach(i=>{ const v=share[i.dataset.m]||0; i.value=Number.isInteger(v)?v:v.toFixed(0); i.readOnly=true; i.style.background='var(--border-light)'; });
+  sbAmtTouched=true;
+  if(!$('sb-items-lock')){ const c=$('sb-split-ui'); if(c) c.insertAdjacentHTML('afterbegin',`<div id="sb-items-lock" style="font-size:11px;color:var(--primary);font-weight:700;margin-bottom:6px">${fi('lock',11)} 已由下方細項自動帶入，要修改請改細項</div>`); }
+  sbUpdAmtHint(); sbUpdItemsHint();
+}
+function sbUpdItemsHint(){
+  const h=$('sb-items-hint'); if(!h) return;
+  if(!sbItemsActive()){ h.innerHTML='<span style="color:var(--text-muted)">填了單價的細項會自動加總到上方的「依金額」分攤。</span>'; return; }
+  const cc=esc(sbCurExpCurrency()); const sum=sbItemsSum(); const total=parseFloat($('sb-e-amount')?.value)||0; const d=total-sum;
+  const lnk='background:none;border:none;color:var(--primary);font-weight:700;font-size:11px;cursor:pointer;padding:0 0 0 6px;font-family:inherit;text-decoration:underline';
+  if(Math.abs(d)<0.5){ h.innerHTML=`<span style="color:var(--success)">✓ 細項合計 ${cc}${Math.round(sum).toLocaleString()}，與總金額相符</span>`; return; }
+  const dTxt=(d>0?'總額多 ':'總額少 ')+cc+Math.round(Math.abs(d)).toLocaleString();
+  if(sbItemAdj){ h.innerHTML=`<span style="color:var(--success)">✓ 細項合計 ${cc}${Math.round(sum).toLocaleString()}，${dTxt}，已按比例分給大家</span><button type="button" style="${lnk}" onclick="sbItemAdj=false;sbApplyItems()">取消</button>`; return; }
+  h.innerHTML=`<span style="color:var(--danger)">⚠ 細項合計 ${cc}${Math.round(sum).toLocaleString()}／總額 ${cc}${Math.round(total).toLocaleString()}（${dTxt}）</span><br>
+    <button type="button" style="${lnk.replace('0 0 0 6px','0')}" onclick="sbItemAdj=true;sbApplyItems()">差額按比例分給大家（免稅、折扣）</button>
+    <button type="button" style="${lnk}" onclick="$('sb-e-amount').value=Math.round(sbItemsSum()*100)/100;sbApplyItems()">總額改成 ${cc}${Math.round(sum).toLocaleString()}</button>`;
+}
+function sbUpdEqHint(){ const n=document.querySelectorAll('#sb-split-ui .chip.on').length; const h=$('sb-split-hint'); if(h) h.textContent='均分 '+n+' 位成員'; }
+function sbUpdRatioHint(){ const t=[...document.querySelectorAll('.sb-rinp')].reduce((s,i)=>s+(parseFloat(i.value)||0),0); const h=$('sb-split-hint'); if(!h) return; if(Math.abs(t-100)<0.01){h.style.color='var(--success)';h.textContent='✓ 加總 100%';} else {h.style.color='var(--danger)';h.textContent='⚠ 目前 '+t.toFixed(1)+'%';} }
+function sbUpdAmtHint(){ const t=[...document.querySelectorAll('.sb-ainp')].reduce((s,i)=>s+(parseFloat(i.value)||0),0); const a=parseFloat($('sb-e-amount')?.value)||0; const h=$('sb-split-hint'); if(!h) return; const cc=sbCurExpCurrency(); if(Math.abs(t-a)<0.01){h.style.color='var(--success)';h.textContent='✓ 加總 '+cc+t.toLocaleString();} else {const d=a-t; h.style.color='var(--danger)';h.textContent='⚠ 分攤合計 '+cc+Math.round(t).toLocaleString()+'／總額 '+cc+Math.round(a).toLocaleString()+'，'+(d>0?'還差 '+cc+Math.round(d).toLocaleString()+' 未分攤':'超出 '+cc+Math.round(-d).toLocaleString());} }
+function sbGetSplit(amt){
+  if(sbItemsActive()){ const sh=sbItemShares(amt); const data=Object.keys(sh).map(m=>({name:m,amount:Math.round(sh[m]*100)/100})); const t=data.reduce((s,d)=>s+d.amount,0); if(Math.abs(t-amt)>2) return null; return {mode:'amount',data}; }
+  if(sbSplitMode==='equal'){ const chk=[...document.querySelectorAll('#sb-split-ui .chip.on')].map(b=>b.dataset.m); if(!chk.length) return null; const sh=amt/chk.length; return {mode:'equal',data:chk.map(m=>({name:m,amount:sh}))}; }
+  if(sbSplitMode==='ratio'){ const rows=[...document.querySelectorAll('.sb-rinp')]; const t=rows.reduce((s,i)=>s+(parseFloat(i.value)||0),0); if(Math.abs(t-100)>0.01) return null; return {mode:'ratio',data:rows.map(i=>({name:i.dataset.m,amount:amt*(parseFloat(i.value)||0)/100}))}; }
+  const rows=[...document.querySelectorAll('.sb-ainp')]; const t=rows.reduce((s,i)=>s+(parseFloat(i.value)||0),0); if(Math.abs(t-amt)>2) return null; return {mode:'amount',data:rows.map(i=>({name:i.dataset.m,amount:parseFloat(i.value)||0}))};
+}
+function sbSubmitExpense(){
+  const name=$('sb-e-name').value.trim(); const amount=parseFloat($('sb-e-amount').value);
+  const date=$('sb-e-date').value, payer=$('sb-e-payer').value, cat=$('sb-e-cat').value;
+  const currency=sbCurExpCurrency();
+  if(!name){toast('請輸入品項名稱');return;} if(!amount||amount<=0){toast('請輸入有效金額');return;}
+  const split=sbGetSplit(amount);
+  if(!split&&sbItemsActive()){ toast('細項合計與總金額不符，請按比例分配差額或修改總額'); sbToggleItems(true); return; }
+  if(!split){ if(sbSplitMode==='ratio') toast('比例加總須等於 100%'); else if(sbSplitMode==='amount') toast('金額加總須等於總金額'); else toast('請選擇至少一位分攤對象'); return; }
+  const notes=$('sb-e-notes').value.trim();
+  const id=sbEditingId||uid();
+  const obj={name,amount,currency,date,payer,cat,notes,splitMode:split.mode,splitAmong:split.data.map(d=>d.name),splitDetails:split.data,updatedBy:ME,updatedAt:Date.now()};
+  const items=sbValidItems().map((it,i)=>({name:it.name.trim()||('細項'+(i+1)),price:parseFloat(it.price)||0,qty:parseFloat(it.qty)||1,among:it.among.slice()}));
+  if(items.length){ obj.items=items; obj.itemAdj=sbItemAdj&&Math.abs(amount-sbItemsSum())>=0.5; }
+  if(!sbEditingId) obj.createdAt=Date.now();
+  fbSet('groups/'+ACTIVE+'/expenses/'+id,obj);
+  if(!sbData().currency) fbSet('groups/'+ACTIVE+'/currency',currency);
+  localStorage.setItem('sb_last_cur',currency);
+  closeModal(); toast(sbEditingId?'✓ 已更新支出':'✓ 已新增支出'); sbEditingId=null;
+}
+function sbDeleteExpense(){
+  if(!sbEditingId) return;
+  const id=sbEditingId;
+  appConfirm('確定刪除此筆支出？',()=>{ fbRemove('groups/'+ACTIVE+'/expenses/'+id); closeModal(); toast('已刪除'); });
+  sbEditingId=null;
+}
+
+/* ── 結清付款 ── */
+function sbOpenSettle(from,to,amount,cur){
+  cur=cur||sbCurrency();
+  modal(`<div class="modal-title">${fi('check-circle',15)} 確認付款</div>
+    <p style="font-size:13px;color:var(--text-muted);margin:4px 0 14px;line-height:1.6"><b>${esc(from)}</b> 將支付 <b>${esc(cur)} ${Math.round(amount).toLocaleString()}</b> 給 <b>${esc(to)}</b><br>確認後將自動記錄於紀錄頁</p>
+    <label class="fld">日期</label><input type="date" class="tag-input" id="sb-settle-date" value="${new Date().toISOString().slice(0,10)}">
+    <div class="modal-acts"><button class="btn gray" onclick="closeModal()">取消</button><button class="btn" style="flex:1" onclick="sbConfirmSettle('${esc(from)}','${esc(to)}',${amount},'${esc(cur)}')">確認已付款</button></div>`);
+}
+function sbConfirmSettle(from,to,amount,cur){
+  const date=$('sb-settle-date').value||new Date().toISOString().slice(0,10);
+  const id=uid();
+  fbSet('groups/'+ACTIVE+'/expenses/'+id,{type:'settlement',name:from+' 轉帳給 '+to,amount:Math.round(amount),currency:cur||sbCurrency(),date,payer:from,cat:'settlement',splitMode:'equal',splitAmong:[to],splitDetails:[{name:to,amount:Math.round(amount)}],createdAt:Date.now(),updatedBy:ME,updatedAt:Date.now()});
+  closeModal(); toast('✓ 已記錄結清付款');
+}
+
+/* ── Excel / CSV 匯入（沿用原分帳格式） ── */
+function sbHandleFile(f){
+  if(!f) return;
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      sbParseRows(raw);
+    }catch(err){ toast('解析失敗：'+err.message); }
+  };
+  r.readAsBinaryString(f);
+}
+function sbIsDup(r){
+  const rAmt=Math.round(r.amount); const rName=(r.name||'').trim();
+  return sbExpensesArr().some(e=>e.type!=='settlement'&&(e.name||'').trim()===rName&&e.date===r.date&&Math.abs(Math.round(e.amount)-rAmt)<=1);
+}
+function sbParseRows(raw){
+  if(!raw.length){toast('未找到資料');return;}
+  const header=raw[0].map(h=>String(h||'').trim());
+  const hasNewFmt=header.some(h=>h.match(/[\(（]欠款[\)）]/));
+  if(hasNewFmt) sbParseNewFmt(raw,header); else sbParseOldFmt(raw);
+}
+function sbParseDateStr(raw){
+  if(raw instanceof Date){ const y=raw.getFullYear(),m=String(raw.getMonth()+1).padStart(2,'0'),d=String(raw.getDate()).padStart(2,'0'); return y+'-'+m+'-'+d; }
+  const s=String(raw).trim();
+  const m=s.match(/(\d{4})[\/\-年](\d{1,2})[\/\-月](\d{1,2})/);
+  if(m) return m[1]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[3]).padStart(2,'0');
+  const d=new Date(s.replace(/\//g,'-')); if(!isNaN(d.getTime())) return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  return s;
+}
+function sbParseNewFmt(raw,header){
+  function findCol(names){ return header.findIndex(h=>names.some(n=>h===n||h.includes(n))); }
+  const nameCol=findCol(['名稱','品項']), catCol=findCol(['類別']), dateCol=findCol(['日期']), amtCol=findCol(['金額']), rateCol=findCol(['匯率']);
+  const oweMap={},paidMap={};
+  header.forEach((h,i)=>{ const ow=h.match(/^(.+?)[\s　]*[\(（]欠款[\)）]$/); const pd=h.match(/^(.+?)[\s　]*[\(（]信出[\)）]$/); if(ow) oweMap[ow[1].trim()]=i; if(pd) paidMap[pd[1].trim()]=i; });
+  const members=Object.keys(oweMap);
+  if(!members.length){toast('找不到成員欄位（欠款）');return;}
+  sbPendingRows=[];
+  raw.slice(1).forEach(row=>{
+    const nameV=nameCol>=0?String(row[nameCol]||'').trim():''; if(!nameV) return;
+    const catV=catCol>=0?String(row[catCol]||'').trim():'';
+    const dateRaw=dateCol>=0?row[dateCol]:'';
+    const amtRaw=amtCol>=0?row[amtCol]:0;
+    const rate=rateCol>=0?(parseFloat(row[rateCol])||1):1;
+    const date=sbParseDateStr(dateRaw);
+    const amount=(parseFloat(amtRaw)||0)*rate;
+    let payer='',maxPaid=0;
+    Object.entries(paidMap).forEach(([m,ci])=>{ const v=(parseFloat(row[ci])||0)*rate; if(v>maxPaid){maxPaid=v;payer=m;} });
+    if(!payer&&members.length) payer=members[0];
+    const splitDetails=[]; members.forEach(m=>{ const v=(parseFloat(row[oweMap[m]])||0)*rate; if(v>0) splitDetails.push({name:m,amount:v}); });
+    const cat=sbMapCat(catV);
+    const errs=[]; if(!nameV)errs.push('名稱'); if(!date)errs.push('日期'); if(!amount||amount<=0)errs.push('金額'); if(!payer)errs.push('付款人'); if(!splitDetails.length)errs.push('分攤');
+    const paidDetails=[]; Object.entries(paidMap).forEach(([m,ci])=>{ const v=(parseFloat(row[ci])||0)*rate; if(v>0) paidDetails.push({name:m,amount:v}); });
+    const rowObj={name:nameV,cat,date,amount,payer,splitDetails,paidDetails,splitAmong:splitDetails.map(d=>d.name),errs};
+    rowObj.dup=(!rowObj.errs.length&&sbIsDup(rowObj));
+    sbPendingRows.push(rowObj);
+  });
+  if(!sbPendingRows.length){toast('未找到有效資料列');return;}
+  sbShowPreview('new',members);
+}
+function sbParseOldFmt(raw){
+  const start=String(raw[0]?.[0]||'').match(/日期|date/i)?1:0;
+  sbPendingRows=[];
+  raw.slice(start).forEach(row=>{
+    if(!row[0]&&!row[1]&&!row[2]) return;
+    const date=sbParseDateStr(row[0]);
+    const name=String(row[1]||'').trim(), amount=parseFloat(row[2]), payer=String(row[3]||'').trim();
+    const splitRaw=row[4]?String(row[4]).split(/[,，、]/).map(s=>s.trim()).filter(Boolean):[];
+    const errs=[]; if(!date)errs.push('日期'); if(!name)errs.push('品項'); if(isNaN(amount)||amount<=0)errs.push('金額'); if(!payer)errs.push('付款人');
+    const splitAmong=splitRaw.length?splitRaw:null;
+    const splitDetails=splitAmong?splitAmong.map(m=>({name:m,amount:amount/splitAmong.length})):null;
+    const rowObj={name,cat:'other',date,amount,payer,splitAmong:splitAmong||[],splitDetails:splitDetails||[],errs};
+    rowObj.dup=(!rowObj.errs.length&&sbIsDup(rowObj));
+    sbPendingRows.push(rowObj);
+  });
+  if(!sbPendingRows.length){toast('未找到有效資料列');return;}
+  sbShowPreview('old',[]);
+}
+function sbShowPreview(fmt,members){
+  const box=$('sb-import-preview'); if(!box) return;
+  const dupCnt=sbPendingRows.filter(r=>r.dup).length, errCnt=sbPendingRows.filter(r=>r.errs.length).length;
+  let h=`<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">${sbPendingRows.length} 筆（可匯入 ${sbPendingRows.length-dupCnt-errCnt}，重複 ${dupCnt}，錯誤 ${errCnt}）</div>`;
+  h+=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:400px">`;
+  if(fmt==='new'){
+    h+=`<tr>${['名稱','類別','日期','金額','付款人','狀態'].map(t=>`<th style="background:var(--bg);padding:6px 8px;text-align:left;border:1px solid var(--border-light)">${t}</th>`).join('')}</tr>`;
+    h+=sbPendingRows.map(r=>{ const c=SBCAT[r.cat]||SBCAT.other; const status=r.dup?'<span style="color:#94a3b8">重複</span>':!r.errs.length?'<span style="color:var(--success)">✓</span>':'<span style="color:var(--danger)">'+r.errs.join(',')+'</span>';
+      return `<tr style="${r.dup?'opacity:.5':''}"><td style="padding:5px 8px;border:1px solid var(--border-light)">${esc(r.name)}</td><td style="padding:5px 8px;border:1px solid var(--border-light)">${c.lbl}</td><td style="padding:5px 8px;border:1px solid var(--border-light)">${esc(r.date)}</td><td style="padding:5px 8px;border:1px solid var(--border-light)">${r.amount.toFixed(0)}</td><td style="padding:5px 8px;border:1px solid var(--border-light)">${esc(r.payer)}</td><td style="padding:5px 8px;border:1px solid var(--border-light)">${status}</td></tr>`;
+    }).join('');
+  } else {
+    h+=`<tr>${['日期','品項','金額','付款人','分攤','狀態'].map(t=>`<th style="background:var(--bg);padding:6px 8px;text-align:left;border:1px solid var(--border-light)">${t}</th>`).join('')}</tr>`;
+    h+=sbPendingRows.map(r=>{ const status=r.dup?'<span style="color:#94a3b8">重複</span>':!r.errs.length?'<span style="color:var(--success)">✓</span>':'<span style="color:var(--danger)">'+r.errs.join(',')+'</span>';
+      return `<tr style="${r.dup?'opacity:.5':''}"><td style="padding:5px 8px;border:1px solid var(--border-light)">${esc(r.date)}</td><td style="padding:5px 8px;border:1px solid var(--border-light)">${esc(r.name)}</td><td style="padding:5px 8px;border:1px solid var(--border-light)">${isNaN(r.amount)?'-':r.amount}</td><td style="padding:5px 8px;border:1px solid var(--border-light)">${esc(r.payer)}</td><td style="padding:5px 8px;border:1px solid var(--border-light)">${esc(r.splitAmong.join(','))||'全員'}</td><td style="padding:5px 8px;border:1px solid var(--border-light)">${status}</td></tr>`;
+    }).join('');
+  }
+  h+=`</table></div>
+  <div style="display:flex;gap:10px;margin-top:12px"><button class="btn" onclick="sbConfirmImport()">確認匯入</button><button class="btn gray" onclick="sbCancelImport()">取消</button></div>`;
+  box.innerHTML=h;
+}
+function sbConfirmImport(){
+  const dups=sbPendingRows.filter(r=>r.dup).length; const valid=sbPendingRows.filter(r=>!r.errs.length&&!r.dup);
+  if(!valid.length){toast('沒有可匯入的有效資料');return;}
+  const existingRoles=(sbData().members||{}); const existingNames=new Set(Object.values(existingRoles).map(r=>r.name));
+  const roleAdds={};
+  valid.forEach(r=>{
+    [r.payer,...r.splitAmong].forEach(n=>{
+      if(n&&!existingNames.has(n)&&!Object.values(roleAdds).some(v=>v.name===n)){
+        roleAdds['members/'+uid()]={name:n,emoji:PERSON_EMOJIS[Math.floor(Math.random()*PERSON_EMOJIS.length)],order:Date.now()};
+      }
+    });
+  });
+  if(Object.keys(roleAdds).length) fbUpdate('groups/'+ACTIVE,roleAdds);
+  const expAdds={};
+  valid.forEach(r=>{
+    const sa=r.splitAmong.length?r.splitAmong:sbMembers();
+    const sd=r.splitDetails.length?r.splitDetails:sa.map(n=>({name:n,amount:r.amount/sa.length}));
+    const id=uid();
+    expAdds[id]={name:r.name,amount:r.amount,currency:sbCurrency(),date:r.date,payer:r.payer,cat:r.cat||'other',splitMode:r.splitDetails.length?'amount':'equal',splitAmong:sa,splitDetails:sd,paidDetails:(r.paidDetails&&r.paidDetails.length?r.paidDetails:null),createdAt:Date.now(),updatedBy:ME,updatedAt:Date.now()};
+  });
+  fbUpdate('groups/'+ACTIVE+'/expenses',expAdds);
+  sbCancelImport();
+  const skipped=sbPendingRows.length-valid.length;
+  toast('匯入 '+valid.length+' 筆'+(dups?'（略過 '+dups+' 筆重複）':'')+((skipped-dups)?'（錯誤 '+(skipped-dups)+' 筆）':''));
+  renderAll();
+}
+function sbCancelImport(){ sbPendingRows=[]; const box=$('sb-import-preview'); if(box) box.innerHTML=''; const inp=$('sb-import-input'); if(inp) inp.value=''; }
+function sbDlTemplate(){
+  const members=sbMembers().length?sbMembers():['成員A','成員B'];
+  const n=members.length;
+  const header=['名稱','類別','日期','幣別','匯率','金額',...members.map(m=>m+' (欠款)'),...members.map(m=>m+' (信出)')];
+  const row1=['晚餐','吃喝','2024/6/1','TWD',1,1200,...members.map(()=>parseFloat((1200/n).toFixed(1))),...members.map((_,i)=>i===0?1200:0)];
+  const row2=['計程車','交通','2024/6/2','TWD',1,350,...members.map(()=>parseFloat((350/n).toFixed(1))),...members.map((_,i)=>i===1?350:0)];
+  const ws=XLSX.utils.aoa_to_sheet([header,row1,row2]);
+  ws['!cols']=[{wch:14},{wch:8},{wch:12},{wch:6},{wch:6},{wch:8},...members.map(()=>({wch:10})),...members.map(()=>({wch:10}))];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'分帳資料');
+  XLSX.writeFile(wb,'分帳匯入範本.xlsx');
+}
+
+/* ════════════ 備忘錄編輯器（移植自旅遊 App） ════════════ */
+function renderMemoLinkRows(m){
+  const rows=(m.links&&m.links.length)?m.links:(m.url?[{name:'',url:m.url}]:[]);
+  return rows.map(lnk=>`<div class="memo-link-row" style="display:flex;gap:6px;margin-bottom:6px">
+    <input class="tag-input memo-lnk-name" placeholder="名稱（選填）" value="${esc(lnk.name||'')}" style="width:36%;min-width:0">
+    <input class="tag-input memo-lnk-url" placeholder="https://" value="${esc(lnk.url||'')}" style="flex:1;min-width:0">
+    <button onclick="this.closest('.memo-link-row').remove()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px 6px;font-size:20px;line-height:1;flex-shrink:0">×</button>
+  </div>`).join('');
+}
+function addMemoLinkRow(){
+  const list=document.getElementById('m-links-list');
+  const div=document.createElement('div');div.className='memo-link-row';div.style.cssText='display:flex;gap:6px;margin-bottom:6px';
+  div.innerHTML=`<input class="tag-input memo-lnk-name" placeholder="名稱（選填）" style="width:36%;min-width:0"><input class="tag-input memo-lnk-url" placeholder="https://" style="flex:1;min-width:0"><button onclick="this.closest('.memo-link-row').remove()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px 6px;font-size:20px;line-height:1;flex-shrink:0">×</button>`;
+  list.appendChild(div);
+}
+function renderMemoLinks(m){
+  const links=(m.links&&m.links.length)?m.links:(m.url?[{name:'',url:m.url}]:[]);
+  const valid=links.filter(l=>l.url);if(!valid.length) return '';
+  return valid.map(lnk=>`<a href="${esc(lnk.url)}" target="_blank" onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:6px;color:#4e8a87;font-size:13px;font-weight:600;text-decoration:none;padding:3px 0">${fi('external-link',13)} ${esc(lnk.name||lnk.url)}</a>`).join('');
+}
+
+/* ── memo rich editor helpers ── */
+function _memoOldToLines(m){
+  const fmt=m.format||'text';
+  if(fmt==='checklist'&&m.items&&m.items.length) return m.items.map(it=>({type:'check',text:it.t||'',done:!!it.d}));
+  const text=m.text||''; if(!text) return [];
+  return text.split('\n').map(line=>(!line.trim()?{type:'gap',text:''}:{type:fmt==='bullets'?'bullet':'text',text:line}));
+}
+function _memoLinesToDom(lines,ed){
+  ed.innerHTML='';
+  const arr=(lines&&lines.length)?lines:[{type:'text',text:''}];
+  arr.forEach(l=>{
+    const div=document.createElement('div'); div.className='me-line';
+    const t=(l.type==='gap')?'text':(l.type||'text');
+    div.dataset.type=t;
+    if(t==='check'&&l.done){div.classList.add('done');div.dataset.done='1';}
+    div.textContent=l.text||'';
+    if(!div.textContent)div.innerHTML='<br>';
+    ed.appendChild(div);
+  });
+}
+function getMemoEditorLines(){
+  const ed=$('m-editor'); if(!ed) return [];
+  return Array.from(ed.querySelectorAll('.me-line')).map(d=>{
+    const type=d.dataset.type||'text';
+    const text=(d.innerText||'').replace(/\n/g,'').trim();
+    return {type,text,done:d.dataset.done==='1'};
+  });
+}
+function memoFmt(type){
+  const ed=$('m-editor'); if(!ed) return;
+  const sel=window.getSelection(); let node=sel&&sel.anchorNode;
+  while(node&&node.parentElement!==ed) node=node.parentElement;
+  if(!node||!node.classList?.contains('me-line')) node=ed.lastElementChild;
+  if(!node) return;
+  node.dataset.type=type;
+  node.className='me-line'+(type==='check'&&node.dataset.done==='1'?' done':'');
+  _updateMFB(type); ed.focus();
+}
+function _updateMFB(type){
+  ['text','bullet','numbered','check'].forEach(t=>{ const b=$('mfb-'+t); if(b) b.classList.toggle('active',t===type); });
+}
+function _moveCursorEnd(el){
+  const r=document.createRange(),s=window.getSelection();
+  r.selectNodeContents(el); r.collapse(false); s.removeAllRanges(); s.addRange(r);
+}
+function _initMemoEditor(lines){
+  const ed=$('m-editor'); if(!ed) return;
+  _memoLinesToDom(lines,ed);
+  _updateMFB((lines&&lines[0]&&lines[0].type)||'text');
+
+  ed.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){
+      e.preventDefault();
+      const sel=window.getSelection(); if(!sel.rangeCount) return;
+      const curRange=sel.getRangeAt(0);
+      // Find .me-line ancestor
+      let node=curRange.startContainer;
+      while(node&&(!node.classList||!node.classList.contains('me-line'))) node=node.parentElement;
+      if(!node||node.parentElement!==ed) return;
+      const curType=node.dataset.type||'text';
+      // Empty bullet/check/numbered → convert to text (like iPhone Notes)
+      if(!(node.innerText||'').replace(/\n/g,'').trim()&&curType!=='text'){
+        node.dataset.type='text'; node.className='me-line'; _updateMFB('text'); return;
+      }
+      // Split at cursor: extract text after cursor into new div
+      const afterRange=document.createRange();
+      afterRange.selectNodeContents(node);
+      afterRange.setStart(curRange.startContainer,curRange.startOffset);
+      const afterFrag=afterRange.extractContents();
+      const afterText=(afterFrag.textContent||'');
+      // Ensure current line is not visually empty
+      if(!(node.textContent||'').trim()) node.innerHTML='<br>';
+      const newDiv=document.createElement('div'); newDiv.className='me-line';
+      newDiv.dataset.type=curType;
+      if(curType==='check'&&node.dataset.done==='1'){newDiv.classList.add('done');newDiv.dataset.done='1';}
+      newDiv.textContent=afterText;
+      if(!afterText) newDiv.innerHTML='<br>';
+      if(node.nextSibling) ed.insertBefore(newDiv,node.nextSibling); else ed.appendChild(newDiv);
+      const r=document.createRange(),s=window.getSelection(); r.setStart(newDiv,0); r.collapse(true); s.removeAllRanges(); s.addRange(r);
+    } else if(e.key==='Backspace'){
+      const sel=window.getSelection(); let node=sel&&sel.anchorNode;
+      while(node&&node.parentElement!==ed) node=node.parentElement;
+      if(node&&node.classList?.contains('me-line')){
+        const txt=(node.innerText||'').replace(/\n/g,'').trim();
+        if(!txt&&ed.querySelectorAll('.me-line').length>1){
+          e.preventDefault();
+          const prev=node.previousSibling||node.nextSibling; node.remove();
+          if(prev){const r=document.createRange(),s=window.getSelection();r.selectNodeContents(prev);r.collapse(false);s.removeAllRanges();s.addRange(r);}
+        }
+      }
+    }
+  });
+
+  ed.addEventListener('input',function(){
+    const sel=window.getSelection(); let node=sel&&sel.anchorNode;
+    while(node&&node.parentElement!==ed) node=node.parentElement;
+    if(!node||!node.classList?.contains('me-line')) return;
+    const txt=node.innerText||'';
+    if(txt.startsWith('- ')||txt.startsWith('• ')){
+      node.dataset.type='bullet'; node.textContent=txt.slice(txt.startsWith('• ')?2:2); _moveCursorEnd(node);
+    } else if(/^\d+\.\s/.test(txt)){
+      node.dataset.type='numbered'; node.textContent=txt.replace(/^\d+\.\s/,''); _moveCursorEnd(node);
+    } else if(txt.startsWith('[ ] ')||txt.startsWith('[] ')){
+      node.dataset.type='check'; node.dataset.done=''; node.className='me-line';
+      node.textContent=txt.replace(/^\[[ ]?\] ?/,''); _moveCursorEnd(node);
+    } else if(txt.startsWith('[x] ')){
+      node.dataset.type='check'; node.dataset.done='1'; node.className='me-line done';
+      node.textContent=txt.replace(/^\[x\] /,''); _moveCursorEnd(node);
+    }
+    _updateMFB(node.dataset.type||'text');
+  });
+
+  ['keyup','click','touchend'].forEach(ev=>ed.addEventListener(ev,function(){
+    const sel=window.getSelection(); let node=sel&&sel.anchorNode;
+    while(node&&node.parentElement!==ed) node=node.parentElement;
+    if(node&&node.classList?.contains('me-line')) _updateMFB(node.dataset.type||'text');
+  }));
+}
+
+/* ── memo display helpers ── */
+function _memoBadge(m){
+  if(m.lines&&m.lines.length){
+    const checks=m.lines.filter(l=>l.type==='check');
+    if(checks.length){const done=checks.filter(l=>l.done).length;return `<span style="font-size:11px;background:#f1f5f9;color:var(--text-muted);padding:1px 7px;border-radius:999px;margin-left:6px;font-weight:400">${done}/${checks.length}</span>`;}
+    const items=m.lines.filter(l=>l.text&&l.type!=='gap');
+    if(items.length>1)return `<span style="font-size:11px;background:#f1f5f9;color:var(--text-muted);padding:1px 7px;border-radius:999px;margin-left:6px;font-weight:400">${items.length} 項</span>`;
+    return '';
+  }
+  const fmt=m.format||'text';
+  if(fmt==='checklist'&&m.items&&m.items.length){const done=m.items.filter(i=>i.d).length;return `<span style="font-size:11px;background:#f1f5f9;color:var(--text-muted);padding:1px 7px;border-radius:999px;margin-left:6px;font-weight:400">${done}/${m.items.length}</span>`;}
+  if(fmt==='bullets'&&m.text){const cnt=m.text.split('\n').filter(Boolean).length;if(cnt>1)return `<span style="font-size:11px;background:#f1f5f9;color:var(--text-muted);padding:1px 7px;border-radius:999px;margin-left:6px;font-weight:400">${cnt} 項</span>`;}
+  return '';
+}
+function renderMemoContent(m){
+  if(m.lines&&m.lines.length){
+    let h='';let numCnt=0;
+    m.lines.forEach((l,i)=>{
+      const t=l.type||'text';
+      if(t==='gap'||!l.text){h+=`<div style="height:1.3em"></div>`;return;}
+      if(t==='text')h+=`<div style="font-size:13px;color:var(--text-secondary);line-height:1.65;word-break:break-word">${esc(l.text)}</div>`;
+      else if(t==='bullet')h+=`<div style="font-size:13px;color:var(--text-secondary);line-height:1.65;display:flex;gap:6px"><span style="flex-shrink:0">•</span><span style="word-break:break-word">${esc(l.text)}</span></div>`;
+      else if(t==='numbered'){numCnt++;h+=`<div style="font-size:13px;color:var(--text-secondary);line-height:1.65;display:flex;gap:4px"><span style="flex-shrink:0;color:var(--text-muted)">${numCnt}.</span><span style="word-break:break-word">${esc(l.text)}</span></div>`;}
+      else if(t==='check')h+=`<span style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span onclick="event.stopPropagation();toggleCheckLine('${m._id}',${i})" style="width:16px;height:16px;border:2px solid ${l.done?'var(--success)':'#cbd5e1'};border-radius:4px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;background:${l.done?'var(--success)':'#fff'};flex-shrink:0">${l.done?'<span style="color:#fff;font-size:10px">✓</span>':''}</span><span style="${l.done?'text-decoration:line-through;color:var(--text-muted)':''}font-size:13px;word-break:break-word">${esc(l.text)}</span></span>`;
+    });
+    return h;
+  }
+  const fmt=m.format||'text';
+  if(fmt==='checklist')return renderChecklistItems(m);
+  if(fmt==='bullets')return `<div style="font-size:13px;color:var(--text-secondary);line-height:1.9">${(m.text||'').split('\n').filter(Boolean).map(l=>'• '+esc(l)).join('<br>')}</div>`;
+  return `<div style="font-size:13px;color:var(--text-secondary);white-space:pre-wrap;line-height:1.65">${esc(m.text||'').replace(/\n/g,'<br>')}</div>`;
+}
+function toggleCheckLine(noteId,idx){
+  const n=(sbData().notes||{})[noteId]; if(!n||!n.lines||!n.lines[idx]) return;
+  const lines=n.lines.map((l,i)=>i===idx?Object.assign({},l,{done:!l.done}):l);
+  fbUpdate('groups/'+ACTIVE+'/notes/'+noteId,{lines,updatedBy:ME,updatedAt:Date.now()});
+}
+
+/* ════════════ 筆記（總覽頁上方；欄位與編輯器沿用旅遊 App 記事頁的備忘錄） ════════════
+   資料：groups/{id}/notes/{noteId} = {title, lines:[{type,text,done}], text, links:[{name,url}], dueDate, pinned, createdAt, updatedAt, updatedBy} */
+let _noteOpen={}, _noteQ='', _noteSearchOpen=false, _noteShowAll=false;
+const NOTE_LIMIT=4;
+function renderChecklistItems(m){ return esc(m.text||''); }
+function notesArr(){
+  const n=sbData().notes||{};
+  return Object.keys(n).map(k=>Object.assign({_id:k},n[k]))
+    .sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0)||(b.updatedAt||b.createdAt||0)-(a.updatedAt||a.createdAt||0));
+}
+function renderNotesSection(){
+  let all=notesArr();
+  const total=all.length;
+  if(_noteQ){ const q=_noteQ.toLowerCase(); all=all.filter(m=>((m.title||'')+'\n'+(m.text||'')+'\n'+(m.links||[]).map(l=>l.name+' '+l.url).join(' ')).toLowerCase().includes(q)); }
+  const sOpen=_noteSearchOpen||!!_noteQ;
+  const todayStr=new Date().toISOString().slice(0,10);
+  let h=`<div class="row-between" style="margin:6px 4px 8px">
+      <div class="sec-title" style="margin:0">${fi('edit-3',14)} 筆記${total?`<span style="font-size:11px;color:var(--text-muted);font-weight:700">（${total}）</span>`:''}</div>
+      <div class="note-tools">
+        ${total?`<button class="pill-btn ${sOpen?'on':''}" onclick="_noteSearchOpen=!_noteSearchOpen;if(!_noteSearchOpen)_noteQ='';renderAll()">${fi('search',12)} ${sOpen?'收合':'搜尋'}</button>`:''}
+        <button class="pill-btn main" onclick="editNote(null)">${fi('plus',12)} 新增筆記</button>
+      </div>
+    </div>`;
+  if(sOpen) h+=`<div style="margin-bottom:8px"><input id="note-q" class="tag-input" placeholder="搜尋筆記標題、內容、連結…" value="${esc(_noteQ)}" oninput="if(event.isComposing)return;_noteQ=this.value;renderAll()" oncompositionend="_noteQ=this.value;renderAll()"></div>`;
+  if(!total){
+    h+=`<div class="card" style="padding:14px;background:#fff;text-align:center;color:var(--text-muted);font-size:12px;cursor:pointer" onclick="editNote(null)">還沒有筆記，點這裡記下要記得的事（例如：誰欠誰現金、要買的東西、待結算事項）</div>`;
+    return h;
+  }
+  if(!all.length){ h+=`<div class="card" style="padding:14px;background:#fff;text-align:center;color:var(--text-muted);font-size:12px">找不到符合的筆記</div>`; return h; }
+  const showAll=_noteShowAll||!!_noteQ;
+  const list=showAll?all:all.slice(0,NOTE_LIMIT);
+  h+=`<div class="card" style="background:#fff">`;
+  list.forEach(m=>{
+    const hasTitle=!!(m.title&&m.title.trim());
+    const isOpen=_noteOpen[m._id]===true;
+    const pin=m.pinned?`<span class="note-pin" title="已置頂">${fi('bookmark',12)}</span>`:'';
+    const due=m.dueDate?`<span class="due-tag ${m.dueDate<=todayStr?'over':''}" style="margin-left:6px;font-weight:400">${fi('clock',9)} 截止 ${fmtDateShort(m.dueDate)}</span>`:'';
+    const links=renderMemoLinks(m);
+    const acts=`<div style="display:flex;gap:2px;flex-shrink:0">
+        <button class="x-btn" title="${m.pinned?'取消置頂':'置頂'}" onclick="event.stopPropagation();toggleNotePin('${m._id}')" style="color:${m.pinned?'#c09060':'var(--text-muted)'}">${fi('bookmark',14)}</button>
+        <button class="x-btn" title="編輯" onclick="event.stopPropagation();editNote('${m._id}')">${fi('edit-2',14)}</button>
+      </div>`;
+    if(hasTitle){
+      h+=`<div class="note-row">
+        <div style="display:flex;align-items:center;gap:6px;padding:10px 12px;cursor:pointer" onclick="_noteOpen['${m._id}']=!_noteOpen['${m._id}'];renderAll()">
+          <span style="color:var(--text-muted);flex-shrink:0;display:inline-flex;transition:transform .18s;transform:rotate(${isOpen?90:0}deg)">${fi('chevron-right',14)}</span>
+          <span style="flex:1;font-weight:700;font-size:14px;word-break:break-word">${pin}${esc(m.title)}${_memoBadge(m)}${due}</span>
+          ${acts}
+        </div>
+        ${isOpen?`<div style="padding:0 12px 10px 34px">${renderMemoContent(m)}${links?`<div style="margin-top:8px">${links}</div>`:''}${m.updatedBy?`<div class="edit-info" style="margin-top:6px">${fi('edit-2',9)} ${esc(m.updatedBy)} · ${fmtTs(m.updatedAt)}</div>`:''}</div>`:''}
+      </div>`;
+    } else {
+      h+=`<div class="note-row" style="padding:10px 12px">
+        <div style="display:flex;gap:8px;align-items:flex-start">
+          <div class="memo-txt" style="flex:1;min-width:0;cursor:pointer" onclick="editNote('${m._id}')">${(pin||due)?`<div style="margin-bottom:2px">${pin}${due}</div>`:''}<div class="note-preview">${renderMemoContent(m)}</div></div>
+          ${acts}
+        </div>
+        ${links?`<div style="padding:6px 0 0">${links}</div>`:''}
+      </div>`;
+    }
+  });
+  h+=`</div>`;
+  if(!showAll&&all.length>NOTE_LIMIT) h+=`<button class="btn sm gray full" style="margin:-4px 0 6px" onclick="_noteShowAll=true;renderAll()">${fi('chevron-down',12)} 顯示全部筆記（還有 ${all.length-NOTE_LIMIT} 則）</button>`;
+  else if(_noteShowAll&&!_noteQ&&all.length>NOTE_LIMIT) h+=`<button class="btn sm gray full" style="margin:-4px 0 6px" onclick="_noteShowAll=false;renderAll()">${fi('chevron-up',12)} 收合</button>`;
+  return h;
+}
+function toggleNotePin(id){ const n=(sbData().notes||{})[id]; if(!n) return; fbUpdate('groups/'+ACTIVE+'/notes/'+id,{pinned:!n.pinned}); toast(n.pinned?'已取消置頂':'已置頂'); }
+function editNote(id){
+  const m=(id&&(sbData().notes||{})[id])||{};
+  const initLines=m.lines&&m.lines.length?m.lines:_memoOldToLines(m);
+  modal(`<div class="modal-title">${fi('edit-3',15)} ${id?'編輯筆記':'新增筆記'}</div>
+    <label class="fld">標題（選填，填了才會顯示標題列與收合功能）</label>
+    <input class="tag-input" id="m-title" placeholder="例：待結算事項、要買的東西" value="${esc(m.title||'')}">
+    <label class="fld">內容</label>
+    <div class="memo-fmt-bar">
+      <button class="mfb" id="mfb-text" onclick="memoFmt('text')">${fi('align-left',12)} 文字</button>
+      <button class="mfb" id="mfb-bullet" onclick="memoFmt('bullet')">${fi('list',12)} 條列</button>
+      <button class="mfb" id="mfb-numbered" onclick="memoFmt('numbered')">${fi('hash',12)} 編號</button>
+      <button class="mfb" id="mfb-check" onclick="memoFmt('check')">${fi('check-square',12)} 清單</button>
+    </div>
+    <div class="memo-editor" id="m-editor" contenteditable="true" spellcheck="false"></div>
+    <p style="font-size:11px;color:var(--text-muted);margin:4px 2px 8px;line-height:1.5">游標在哪行 → 點上方按鈕切換格式；或直接打 <code>- </code> / <code>1. </code> / <code>[ ] </code> 自動辨識；點 ☐ 可勾選</p>
+    <label class="fld">連結（選填，可新增多個）</label>
+    <div id="m-links-list">${renderMemoLinkRows(m)}</div>
+    <button onclick="addMemoLinkRow()" class="btn ghost" style="width:100%;margin-top:4px;font-size:12px;padding:7px 12px">${fi('plus',12)} 新增連結</button>
+    <label class="fld">截止日期（選填，到期當天會顯示提醒）</label><input type="date" class="tag-input" id="m-due" value="${esc(m.dueDate||'')}">
+    <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;font-weight:700;color:var(--text-secondary)"><input type="checkbox" id="m-pin" ${m.pinned?'checked':''} style="width:18px;height:18px"> 置頂這則筆記</label>
+    ${id&&m.updatedBy?`<div class="edit-info" style="margin-top:8px">${fi('edit-2',9)} ${esc(m.updatedBy)} · ${fmtTs(m.updatedAt)}</div>`:''}
+    <div class="modal-acts">${id?`<button class="btn danger" onclick="deleteNote('${id}')">刪除</button>`:''}
+    <button class="btn" style="flex:1" onclick="saveNote('${id||''}')">儲存</button></div>`);
+  _initMemoEditor(initLines);
+  // 在編輯器中點勾選框（行首 ☐）切換完成狀態
+  $('m-editor').addEventListener('click',e=>{
+    const line=e.target.closest&&e.target.closest('.me-line');
+    if(!line||line.dataset.type!=='check') return;
+    const x=e.clientX-line.getBoundingClientRect().left;
+    if(x>20) return;
+    const on=line.dataset.done!=='1'; line.dataset.done=on?'1':''; line.classList.toggle('done',on);
+  });
+}
+function saveNote(id){
+  const lines=getMemoEditorLines();
+  const hasContent=lines.some(l=>l.text&&l.text.trim());
+  const links=[]; document.querySelectorAll('#m-links-list .memo-link-row').forEach(row=>{ const u=row.querySelector('.memo-lnk-url').value.trim(); if(u) links.push({name:row.querySelector('.memo-lnk-name').value.trim(),url:u}); });
+  const title=($('m-title').value||'').trim();
+  if(!hasContent&&!links.length&&!title){ toast('請輸入內容'); return; }
+  // 去掉最後面多餘的空白行
+  while(lines.length&&!lines[lines.length-1].text) lines.pop();
+  const text=lines.filter(l=>l.text).map(l=>l.text).join('\n');
+  const obj={title,lines,text,links,dueDate:$('m-due').value||'',pinned:$('m-pin').checked,updatedBy:ME||'',updatedAt:Date.now()};
+  if(!id){ obj.createdAt=Date.now(); fbSet('groups/'+ACTIVE+'/notes/'+uid(),obj); }
+  else fbUpdate('groups/'+ACTIVE+'/notes/'+id,obj);
+  _seg={}; closeModal(); toast('已儲存筆記');
+}
+function deleteNote(id){
+  const m=(sbData().notes||{})[id]||{};
+  appConfirm('確定要刪除「'+((m.title||m.text||'這則筆記').slice(0,20))+'」？此操作無法復原。',()=>{ fbRemove('groups/'+ACTIVE+'/notes/'+id); closeModal(); toast('已刪除'); });
+}
+
+/* ════════════ 統計（可依月份切換；參考舊分帳 App 的統計頁） ════════════ */
+let _statChipsOpen=false;
+function statMonthsWithData(){
+  const set=new Set(); sbExpensesArr().forEach(e=>{ if(e.type!=='settlement'&&/^\d{4}-\d{2}/.test(e.date||'')) set.add(e.date.slice(0,7)); });
+  return [...set].sort();
+}
+function ymNow(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function ymShift(ym,n){ const [y,m]=ym.split('-').map(Number); const d=new Date(y,m-1+n,1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function ensureStatMonth(){
+  if(STAT_M) return;
+  const ms=statMonthsWithData(); const now=ymNow();
+  STAT_M=ms.includes(now)||!ms.length?now:ms[ms.length-1];   // 本月沒資料時跳到最近有資料的月份
+}
+function setStatMonth(v){ STAT_M=v; _statChipsOpen=false; renderAll(); }
+function sbStatsByCur(ym){
+  const exps=sbExpensesArr().filter(e=>e.type!=='settlement'&&(!ym||ym==='all'||(e.date||'').slice(0,7)===ym));
+  const out={};
+  exps.forEach(e=>{
+    const c=sbExpCur(e);
+    const g=out[c]=out[c]||{cur:c,total:0,count:0,cats:{},paid:{},owed:{}};
+    const amt=e.amount||0;
+    g.total+=amt; g.count++;
+    const ck=SBCAT[e.cat]?e.cat:'other';
+    g.cats[ck]=(g.cats[ck]||0)+amt;
+    if(e.paidDetails&&e.paidDetails.length) e.paidDetails.forEach(d=>{g.paid[d.name]=(g.paid[d.name]||0)+(d.amount||0);});
+    else if(e.payer) g.paid[e.payer]=(g.paid[e.payer]||0)+amt;
+    (e.splitDetails||[]).forEach(d=>{g.owed[d.name]=(g.owed[d.name]||0)+(d.amount||0);});
+  });
+  return Object.values(out).sort((a,b)=>b.total-a.total);
+}
+function shortMoney(v){ return v>=10000?(v/10000).toFixed(v>=100000?0:1)+'萬':v>=1000?(v/1000).toFixed(v>=10000?0:1)+'k':Math.round(v).toLocaleString(); }
+function renderTrend(cur){
+  const ms=statMonthsWithData();
+  const end=(STAT_M&&STAT_M!=='all')?STAT_M:(ms[ms.length-1]||ymNow());
+  const months=[]; for(let i=5;i>=0;i--) months.push(ymShift(end,-i));
+  const tot=months.map(ym=>sbExpensesArr().filter(e=>e.type!=='settlement'&&sbExpCur(e)===cur&&(e.date||'').slice(0,7)===ym).reduce((s,e)=>s+(e.amount||0),0));
+  const max=Math.max(1,...tot);
+  return `<div class="trend">${months.map((ym,i)=>{
+    const v=tot[i]; const h=v>0?Math.max(4,Math.round(v/max*78)):2;
+    return `<div class="trend-col ${ym===STAT_M?'cur':''}" onclick="setStatMonth('${ym}')"><div class="trend-val">${v>0?shortMoney(v):''}</div><div class="trend-bar" style="height:${h}px"></div><div class="trend-lbl">${parseInt(ym.slice(5),10)}月</div></div>`;
+  }).join('')}</div>`;
+}
+function sbRenderStats(){
+  ensureStatMonth();
+  const ms=statMonthsWithData();
+  const isAll=STAT_M==='all';
+  const label=isAll?'全部期間':fmtYM(STAT_M);
+  let h=`<div class="mnav">
+      <button class="marr" ${isAll?'disabled':''} onclick="setStatMonth(ymShift(STAT_M,-1))">${fi('chevron-left',18)}</button>
+      <span class="mlbl" onclick="_statChipsOpen=!_statChipsOpen;renderAll()">${esc(label)} ${fi(_statChipsOpen?'chevron-up':'chevron-down',14)}</span>
+      <button class="marr" ${isAll?'disabled':''} onclick="setStatMonth(ymShift(STAT_M,1))">${fi('chevron-right',18)}</button>
+    </div>`;
+  if(_statChipsOpen) h+=`<div class="mchips"><span class="chip ${isAll?'on':''}" onclick="setStatMonth('all')">全部期間</span>${ms.slice().reverse().map(ym=>`<span class="chip ${ym===STAT_M?'on':''}" onclick="setStatMonth('${ym}')">${esc(fmtYM(ym))}</span>`).join('')}</div>`;
+  const groups=sbStatsByCur(STAT_M);
+  const allCurs=sbAllCurrencies();
+  const multiCur=allCurs.length>1;
+  const money=(c,v)=>esc(c)+' '+Math.round(v).toLocaleString();
+  const tagHtml=(cur,first)=>multiCur?`<div style="display:flex;align-items:center;gap:8px;margin:${first?'6px':'22px'} 0 4px"><div style="flex:1;height:1.5px;background:#c09060;opacity:.3"></div><span style="font-size:11px;font-weight:800;color:#7a4f2e;letter-spacing:.08em;background:#ede0d0;padding:2px 10px;border-radius:999px">${esc(cur)}</span><div style="flex:1;height:1.5px;background:#c09060;opacity:.3"></div></div>`:'';
+  // 依幣別分開：每種幣別都有「近 6 個月趨勢」＋類別分布＋成員支出
+  const curOrder=[...new Set([...groups.map(g=>g.cur),...allCurs])];
+  h+=curOrder.map((cur,gi)=>{
+    const g=groups.find(x=>x.cur===cur);
+    let out=tagHtml(cur,gi===0);
+    out+=`<div class="sec-title">${fi('bar-chart-2',13)} 近 6 個月趨勢${multiCur?'':`<span style="font-size:11px;color:var(--text-muted);font-weight:700">（${esc(cur)}）</span>`}</div>
+      <div class="card" style="padding:4px 12px 10px;background:#fff">${renderTrend(cur)}</div>`;
+    if(!g){ out+=`<div class="card" style="padding:16px;background:#fff;text-align:center;color:var(--text-muted);font-size:12px">${esc(label)}沒有 ${esc(cur)} 的支出</div>`; return out; }
+    const cats=Object.keys(g.cats).sort((a,b)=>g.cats[b]-g.cats[a]);
+    const R=42, C=2*Math.PI*R; let off=0;
+    const arcs=cats.map(k=>{ const frac=g.total?g.cats[k]/g.total:0, len=frac*C; const seg=`<circle cx="60" cy="60" r="${R}" fill="none" stroke="${SBCAT[k].color}" stroke-width="16" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off}"/>`; off+=len; return seg; }).join('');
+    const donut=`<div style="position:relative;width:120px;height:120px;flex-shrink:0">
+      <svg viewBox="0 0 120 120" width="120" height="120" style="transform:rotate(-90deg)"><circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--border-light)" stroke-width="16"/>${arcs}</svg>
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        <div style="font-size:12px;font-weight:900;line-height:1.2">${esc(g.cur)}<br>${Math.round(g.total).toLocaleString()}</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${g.count} 筆</div>
+      </div></div>`;
+    const legend=cats.map(k=>{ const c=SBCAT[k], v=g.cats[k], pct=g.total?v/g.total*100:0;
+      return `<div onclick="sbStatsGoCat('${k}')" style="display:flex;align-items:center;gap:6px;padding:8px 0;border-bottom:1px solid var(--border-light);cursor:pointer">
+        <span style="width:9px;height:9px;border-radius:50%;background:${c.color};flex-shrink:0"></span>
+        <span style="flex:1;min-width:0;font-size:13px;font-weight:700;white-space:nowrap">${c.lbl}<span style="color:var(--text-muted);font-weight:400;margin-left:2px">›</span></span>
+        <span style="font-size:11px;color:var(--text-muted)">${Math.round(pct)}%</span>
+        <span style="font-size:13px;font-weight:800;text-align:right;white-space:nowrap">${money(g.cur,v)}</span>
+      </div>`; }).join('');
+    const names=new Set(sbMembers()); Object.keys(g.owed).forEach(n=>names.add(n));
+    const list=[...names].filter(n=>(g.owed[n]||0)>0.01).sort((a,b)=>(g.owed[b]||0)-(g.owed[a]||0));
+    const maxOwed=Math.max(1,...list.map(n=>g.owed[n]||0));
+    const memRows=list.map(n=>{ const o=g.owed[n]||0, p=g.paid[n]||0;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border-light)">
+        ${sbAvEl(n,34)}
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:baseline"><span style="font-size:13px;font-weight:700">${esc(n)}</span><span style="margin-left:auto;font-size:13px;font-weight:800;color:var(--primary)">${money(g.cur,o)}</span></div>
+          <div style="height:7px;background:var(--border-light);border-radius:999px;margin-top:6px;overflow:hidden"><div style="height:100%;width:${(o/maxOwed*100).toFixed(1)}%;background:var(--primary);border-radius:999px"></div></div>
+          <div style="font-size:10.5px;color:var(--text-muted);margin-top:4px">實際付款 ${money(g.cur,p)}</div>
+        </div>
+      </div>`; }).join('');
+    out+=`<div class="sec-title">${fi('pie-chart',13)} 類別分布</div>
+      <div class="card" style="padding:12px 14px;background:#fff;display:flex;align-items:center;gap:14px">${donut}<div style="flex:1;min-width:0">${legend}</div></div>
+      <div class="sec-title">${fi('users',13)} 成員支出</div>
+      <div class="card" style="padding:4px 14px;background:#fff">${memRows||'<div class="empty" style="padding:16px 10px">尚無資料</div>'}</div>`;
+    return out;
+  }).join('');
+  h+=`<p style="font-size:11px;color:var(--text-muted);margin:10px 2px 0;line-height:1.6">成員金額為各自應分攤的花費；轉帳（已完成的付款）不計入統計。點趨勢圖的月份可切換；點類別可查看該月份、該類別的紀錄。</p>`;
+  return h;
+}
+
+/* ════════════ 設定 ════════════ */
+function sbRenderSettings(){
+  const g=sbData(); const cur=sbCurrency(); const ms=memberList();
+  let h=`<div class="sec-title">${fi('layers',13)} 群組</div>
+  <div class="card" style="padding:4px 14px">
+    <div class="srow"><div class="lbl">${esc(g.name||'未命名群組')}<div class="sub">${Object.keys(g.expenses||{}).length} 筆紀錄 · ${Object.keys(g.notes||{}).length} 則筆記</div></div>
+      <button class="btn sm ghost" onclick="editGroup('${ACTIVE}')">${fi('edit-2',12)} 編輯</button></div>
+    <div class="srow"><div class="lbl">預設幣別<div class="sub">新增支出時自動帶入，也可以每筆個別改</div></div>
+      <select class="tag-input" style="width:96px" onchange="sbSaveCurrency(this.value)">${CURS.map(c=>`<option ${cur===c?'selected':''}>${c}</option>`).join('')}</select></div>
+    <div class="srow"><div class="lbl">切換／新增群組<div class="sub">目前共 ${groupsArr().length} 個群組</div></div>
+      <button class="btn sm ghost" onclick="openGroupPicker()">${fi('repeat',12)} 群組</button></div>
+  </div>`;
+  h+=`<div class="sec-title">${fi('users',13)} 成員</div>
+  <div class="card" style="padding:12px">
+    ${ms.length?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${ms.map(m=>`<button class="mem-chip" onclick="editMember('${m._id}')"><span style="font-size:16px">${m.emoji||'🙂'}</span><span style="font-size:13px;font-weight:700">${esc(m.name)}</span>${m.name===ME?'<span style="font-size:10px;color:var(--primary);font-weight:700">（我）</span>':''}</button>`).join('')}</div>`:'<p style="font-size:12px;color:var(--text-muted);margin:0 0 10px">尚無成員</p>'}
+    <div style="display:flex;gap:8px">
+      <button class="btn sm" onclick="editMember(null)">${fi('user-plus',13)} 新增成員</button>
+      <button class="btn sm ghost" onclick="openMePicker()">${fi('user',13)} 我是${ME?'：'+esc(ME):'…'}</button>
+    </div>
+    <p style="font-size:11px;color:var(--text-muted);margin:8px 2px 0;line-height:1.6">點成員可改名字、頭像或刪除。改名字時，所有紀錄中的名字會一起更新。</p>
+  </div>`;
+  h+=`<div class="sec-title">${fi('download-cloud',13)} 從旅遊 App 搬資料</div>
+  <div class="card" style="padding:12px">
+    <button class="btn full" onclick="openTravelImport()">${fi('download-cloud',14)} 從旅遊 App 匯入分帳</button>
+    <p style="font-size:11px;color:var(--text-muted);margin:8px 2px 0;line-height:1.6">直接讀取旅遊 App 雲端上的旅程，選一趟就會把成員、頭像和全部支出（含細項、轉帳）複製成一個新群組。只讀取，不會改到旅遊 App 的資料。</p>
+  </div>`;
+  h+=`<div class="sec-title">${fi('upload',13)} 匯入 Excel/CSV</div>
+  <div class="card" style="padding:12px">
+    <input type="file" id="sb-import-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="sbHandleFile(this.files[0])">
+    <button class="btn full ghost" onclick="document.getElementById('sb-import-input').click()">${fi('upload',14)} 選擇檔案匯入</button>
+    <button class="btn full gray" style="margin-top:8px" onclick="sbDlTemplate()">${fi('download',14)} 下載匯入範本</button>
+    <div id="sb-import-preview" style="margin-top:12px"></div>
+    <p style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.6">欄位：名稱、類別、日期、幣別、匯率、金額，接著每位成員各兩欄 <b>[姓名](欠款)</b>／<b>[姓名](信出)</b>。類別可填：吃喝、購物、娛樂、交通、住宿、其他。名單中沒有的人名會自動加入成員；金額會依匯率換算後記為目前的「預設幣別」。</p>
+  </div>`;
+  h+=`<div class="sec-title">${fi('database',13)} 資料備份</div>
+  <div class="card" style="padding:12px">
+    <button class="btn full ghost" onclick="sbExportData()">${fi('download',14)} 匯出此群組資料（JSON）</button>
+    <input type="file" id="sb-restore-input" accept=".json" style="display:none" onchange="sbImportData(this.files[0])">
+    <button class="btn full gray" style="margin-top:8px" onclick="document.getElementById('sb-restore-input').click()">${fi('upload',14)} 匯入分帳資料（覆蓋支出）</button>
+    <p style="font-size:11px;color:var(--text-muted);margin:8px 2px 0;line-height:1.6">可匯入本 App 或旅遊 App「匯出此旅程分帳資料」的 JSON 檔。</p>
+  </div>`;
+  h+=`<div class="sec-title">${fi('wifi',13)} 跨裝置同步</div>
+  <div class="card" style="padding:12px">
+    <label class="fld" style="margin-top:0">房間代碼（每台裝置填一樣的代碼就會即時同步）</label>
+    <div style="display:flex;gap:8px"><input class="tag-input" id="room-inp" value="${esc(ROOM)}"><button class="btn sm" style="white-space:nowrap;flex-shrink:0" onclick="switchRoom($('room-inp').value)">連線</button></div>
+    <p style="font-size:11px;color:var(--text-muted);margin:8px 2px 0;line-height:1.6">${db?(LAST_SYNC?'✓ 已連線雲端':'連線中…'):'Firebase 無法連線，目前為本機模式'}。資料與舊分帳 App 分開存放，互不影響。</p>
+  </div>`;
+  h+=`<div class="sec-title">${fi('trash-2',13)} 清除資料</div>
+  <div class="card" style="padding:12px">
+    <button class="btn full danger" onclick="sbClearAll()">${fi('trash-2',14)} 清除此群組所有分帳紀錄</button>
+  </div>
+  <p style="text-align:center;font-size:10px;color:var(--text-muted);margin:16px 0 0">分帳 App · 房間 ${esc(ROOM)}</p>`;
+  return h;
+}
+function sbSaveCurrency(v){ fbSet('groups/'+ACTIVE+'/currency',v); toast('已更新幣別'); }
+function sbClearAll(){ appConfirm('確定清除此群組所有分帳紀錄？（筆記會保留）此操作無法復原。',()=>{ fbSet('groups/'+ACTIVE+'/expenses',null); toast('已清除'); }); }
+
+/* ── 成員 ── */
+let _memEmoji='';
+function editMember(id){
+  const m=id?(sbData().members||{})[id]:{};
+  _memEmoji=m.emoji||PERSON_EMOJIS[memberList().length%PERSON_EMOJIS.length];
+  modal(`<div class="modal-title">${id?'編輯成員':'新增成員'}</div>
+    <label class="fld">名字</label><input class="tag-input" id="mem-name" value="${esc(m.name||'')}" placeholder="例：媽媽">
+    <label class="fld">頭像</label>
+    <div class="emoji-grid" style="grid-template-columns:repeat(6,1fr)">${PERSON_EMOJIS.map(e=>`<button type="button" class="emoji-btn ${e===_memEmoji?'on':''}" onclick="_memEmoji='${e}';document.querySelectorAll('.emoji-btn').forEach(b=>b.classList.toggle('on',b===this))">${e}</button>`).join('')}</div>
+    <div class="modal-acts">${id?`<button class="btn danger" onclick="deleteMember('${id}')">刪除</button>`:''}<button class="btn" style="flex:1" onclick="saveMember('${id||''}')">儲存</button></div>`);
+  setTimeout(()=>$('mem-name')?.focus(),60);
+}
+function saveMember(id){
+  const name=$('mem-name').value.trim(); if(!name){ toast('請輸入名字'); return; }
+  const dup=memberList().find(x=>x.name===name&&x._id!==id); if(dup){ toast('已經有叫「'+name+'」的成員'); return; }
+  if(!id){ fbSet('groups/'+ACTIVE+'/members/'+uid(),{name,emoji:_memEmoji,order:Date.now()}); closeModal(); toast('已新增成員'); return; }
+  const old=sbData().members[id].name;
+  const upd={['members/'+id+'/name']:name,['members/'+id+'/emoji']:_memEmoji};
+  if(old!==name){
+    // 改名：把所有紀錄裡的舊名字一起換掉
+    const sw=n=>n===old?name:n;
+    const exps=sbData().expenses||{};
+    Object.keys(exps).forEach(k=>{
+      const e=exps[k]; let hit=false;
+      const ne=JSON.parse(JSON.stringify(e));
+      if(ne.payer===old){ ne.payer=name; hit=true; }
+      if(ne.splitAmong&&ne.splitAmong.includes(old)){ ne.splitAmong=ne.splitAmong.map(sw); hit=true; }
+      ['splitDetails','paidDetails'].forEach(f=>{ if(ne[f]&&ne[f].some(d=>d.name===old)){ ne[f]=ne[f].map(d=>Object.assign({},d,{name:sw(d.name)})); hit=true; } });
+      if(ne.items) ne.items.forEach(it=>{ if(it.among&&it.among.includes(old)){ it.among=it.among.map(sw); hit=true; } });
+      if(ne.type==='settlement'&&hit) ne.name=(ne.payer||'')+' 轉帳給 '+((ne.splitDetails&&ne.splitDetails[0]&&ne.splitDetails[0].name)||'');
+      if(hit) upd['expenses/'+k]=ne;
+    });
+    if(ME===old) setMe(name);
+  }
+  fbUpdate('groups/'+ACTIVE,upd); closeModal(); toast('已更新成員');
+}
+function deleteMember(id){
+  const m=sbData().members[id];
+  const used=sbExpensesArr().some(e=>e.payer===m.name||(e.splitAmong||[]).includes(m.name)||(e.splitDetails||[]).some(d=>d.name===m.name)||(e.paidDetails||[]).some(d=>d.name===m.name));
+  if(used){ toast('「'+m.name+'」已有分帳紀錄，無法刪除（可以改名字）'); return; }
+  appConfirm('確定刪除成員「'+m.name+'」？',()=>{ fbRemove('groups/'+ACTIVE+'/members/'+id); closeModal(); toast('已刪除'); });
+}
+/* 把紀錄中出現、但成員名單沒有的名字補進成員 */
+function membersFromExpenses(expenses,existing){
+  const names=new Set(Object.values(existing||{}).map(m=>m.name)); const add={}; let i=Object.keys(existing||{}).length;
+  Object.values(expenses||{}).forEach(e=>{
+    [e.payer,...(e.splitAmong||[]),...(e.splitDetails||[]).map(d=>d.name),...(e.paidDetails||[]).map(d=>d.name),...[].concat(...(e.items||[]).map(it=>it.among||[]))].forEach(n=>{
+      if(n&&!names.has(n)){ names.add(n); add[uid()+i]={name:n,emoji:PERSON_EMOJIS[i%PERSON_EMOJIS.length],order:Date.now()+i}; i++; }
+    });
+  });
+  return add;
+}
+
+/* ════════════ 從旅遊 App 匯入（只讀取旅遊 App 的 Firebase） ════════════ */
+let _travelTrips=null;
+function travelDb(){
+  const app=firebase.apps.find(a=>a.name==='travel')||firebase.initializeApp(TRAVEL_CONFIG,'travel');
+  return firebase.database(app);
+}
+function openTravelImport(){
+  modal(`<div class="modal-title">${fi('download-cloud',15)} 從旅遊 App 匯入</div><div id="tv-list" class="empty" style="padding:30px 10px">讀取旅遊 App 的旅程中…</div>`);
+  let done=false;
+  setTimeout(()=>{ if(!done){ const b=$('tv-list'); if(b) b.innerHTML='讀取時間較久，請確認網路連線…'; } },8000);
+  try{
+    travelDb().ref(TRAVEL_ROOT+'/trips').once('value').then(snap=>{
+      done=true; _travelTrips=snap.val()||{}; renderTravelList();
+    }).catch(e=>{ done=true; const b=$('tv-list'); if(b) b.innerHTML='讀取失敗：'+esc(e.message); });
+  }catch(e){ done=true; $('tv-list').innerHTML='讀取失敗：'+esc(e.message); }
+}
+function renderTravelList(){
+  const box=$('tv-list'); if(!box) return;
+  const ids=Object.keys(_travelTrips).sort((a,b)=>String(_travelTrips[b].startDate||'').localeCompare(String(_travelTrips[a].startDate||'')));
+  if(!ids.length){ box.innerHTML='旅遊 App 裡沒有旅程'; return; }
+  box.className=''; box.style.padding='0';
+  box.innerHTML=`<p style="font-size:12px;color:var(--text-muted);margin:2px 0 12px">選一趟旅程，會複製成一個新的分帳群組（含成員、頭像、全部支出、細項與轉帳紀錄）。</p>`+ids.map(id=>{
+    const t=_travelTrips[id]; const exps=Object.values((t.splitbill&&t.splitbill.expenses)||{});
+    const n=exps.filter(e=>e.type!=='settlement').length; const roles=Object.values(t.roles||{});
+    const already=groupsArr().find(g=>g.importedFrom===id);
+    return `<div class="grp-item" style="cursor:default">
+      <div style="flex:1;min-width:0"><div style="font-weight:900;font-size:14px">${esc(t.name||'未命名旅程')}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${esc([t.startDate,t.endDate].filter(Boolean).join(' ~ '))}${t.startDate?' · ':''}${roles.map(r=>r.emoji||'🙂').join('')} · ${n} 筆支出${already?' · <span style="color:var(--primary);font-weight:700">已匯入過</span>':''}</div></div>
+      <button class="btn sm ${n?'':'gray'}" ${n?'':'disabled'} onclick="importTravelTrip('${id}')">${already?'重新匯入':'匯入'}</button>
+    </div>`;
+  }).join('');
+}
+function importTravelTrip(tid){
+  const t=_travelTrips&&_travelTrips[tid]; if(!t) return;
+  const sb=t.splitbill||{}; const expenses=JSON.parse(JSON.stringify(sb.expenses||{}));
+  const members={}; Object.keys(t.roles||{}).forEach((k,i)=>{ const r=t.roles[k]; if(r&&r.name) members[k]={name:r.name,emoji:r.emoji||'🙂',order:i}; });
+  Object.assign(members,membersFromExpenses(expenses,members));
+  const currency=sb.currency||'NT$';
+  const exist=groupsArr().find(g=>g.importedFrom===tid);
+  const doIt=(gid,isNew)=>{
+    if(isNew) fbSet('groups/'+gid,{name:t.name||'旅遊分帳',currency,members,expenses,importedFrom:tid,importedAt:Date.now(),createdAt:Date.now()});
+    else fbUpdate('groups/'+gid,{currency,members,expenses,importedAt:Date.now()});
+    closeModal(); switchGroup(gid); SBTAB='home'; renderAll();
+    toast('已匯入 '+Object.keys(expenses).length+' 筆紀錄');
+  };
+  if(exist) appConfirm(`「${exist.name}」已經匯入過。\n要用旅遊 App 目前的資料覆蓋這個群組的成員和支出嗎？（筆記會保留）`,()=>doIt(exist._id,false),'覆蓋更新');
+  else doIt(uid(),true);
+}
+
+/* ════════════ 啟動 ════════════ */
+window.addEventListener('load', startSync);
+</script>
+</body>
+</html>
