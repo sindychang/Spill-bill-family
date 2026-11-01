@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <link rel="apple-touch-icon" href="panda.jpeg">
-    <link rel="icon" type="image/png" href="panda.jpeg">
+  <link rel="apple-touch-icon" href="panda.jpeg">
+  <link rel="icon" type="image/png" href="panda.jpeg">
   <meta charset="UTF-8">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
@@ -176,6 +176,13 @@
   .due-tag.over{background:var(--danger-light);color:var(--danger)}
 
   /* ── 分帳 App 追加樣式 ── */
+  /* 頂部與底部欄跟內容同寬（最寬 680px 置中），電腦上不會拉得很寬，手機上則是滿版 */
+  .topbar{max-width:680px;margin:0 auto}
+  .nav{max-width:680px;margin:0 auto;align-items:center}
+  .nav-fab{flex:1;display:flex;justify-content:center}
+  .nav-fab button{width:54px;height:54px;margin-top:-26px;border-radius:50%;border:4px solid var(--bg);background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-lg)}
+  .nav-fab button:active{transform:scale(.92)}
+  @media (min-width:700px){ body{background:#e6e5ee} .page{background:var(--bg);min-height:calc(100vh - 76px)} }
   .topbar-title .tt-caret{opacity:.75;display:inline-flex}
   .grp-btn{background:none;border:none;color:#fff;padding:0;text-align:left;min-width:0;max-width:100%;font-family:inherit;cursor:pointer}
   .month-head{display:flex;align-items:baseline;justify-content:space-between;margin:18px 4px 2px;font-size:14px;font-weight:900;color:#7a4f2e}
@@ -191,8 +198,8 @@
   .trend-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;cursor:pointer;min-width:0}
   .trend-val{font-size:9.5px;color:var(--text-muted);font-weight:700;margin-bottom:3px;white-space:nowrap}
   .trend-bar{width:70%;max-width:30px;border-radius:6px 6px 2px 2px;background:#c7d9d8;min-height:2px}
-  .trend-col.cur .trend-bar{background:#4e8a87}
-  .trend-col.cur .trend-val{color:#4e8a87}
+  .trend-col.cur .trend-bar{background:var(--tc,#4e8a87)}
+  .trend-col.cur .trend-val{color:var(--tc,#4e8a87)}
   .trend-lbl{font-size:10.5px;color:var(--text-muted);font-weight:700;margin-top:5px}
   .trend-col.cur .trend-lbl{color:var(--text-primary)}
   .note-row{border-bottom:1px solid var(--border-light)}
@@ -232,7 +239,6 @@
 
   <div class="page active"><div class="wrap" id="main"></div></div>
 
-  <button class="fab hidden" id="fab" onclick="sbOpenAddModal(null)"></button>
   <div class="nav" id="nav"></div>
   <div class="modal-bg" id="modal-bg"><div class="modal" id="modal"></div></div>
   <div class="cdialog-bg" id="cdialog-bg" onclick="if(event.target===this)closeCDialog()"><div class="cdialog" id="cdialog"></div></div>
@@ -413,9 +419,10 @@ function renderAll(){
   $('tb-sub').textContent=g?`${sbMembers().length} 位成員 · 預設幣別 ${sbCurrency()}`:'先建立一個分帳群組';
   $('me-name').textContent=ME?(sbAv(ME)+' '+ME):'我是…';
   $('me-btn').style.display=g?'':'none';
-  $('nav').innerHTML=TABS.map(([t,icon,lab])=>`<button class="nav-item${SBTAB===t?' active':''}" onclick="sbGoTab('${t}')"><span class="ico">${fi(icon,22)}</span><span class="lab">${lab}</span></button>`).join('');
+  const navBtn=([t,icon,lab])=>`<button class="nav-item${SBTAB===t?' active':''}" onclick="sbGoTab('${t}')"><span class="ico">${fi(icon,22)}</span><span class="lab">${lab}</span></button>`;
+  // 新增紀錄的 ＋ 放在底部頁籤正中間（同舊分帳 App）
+  $('nav').innerHTML=TABS.slice(0,2).map(navBtn).join('')+`<div class="nav-fab"><button onclick="sbOpenAddModal(null)" aria-label="新增支出">${fi('plus',26)}</button></div>`+TABS.slice(2).map(navBtn).join('');
   $('nav').style.display=g?'':'none';
-  const f=$('fab'); f.innerHTML=fi('plus',24); f.classList.toggle('hidden',!(g&&(SBTAB==='home'||SBTAB==='records')));
   let h='';
   if(!g) h=renderWelcome();
   else if(!sbMembers().length&&SBTAB!=='settings') h=`<div class="empty"><span class="big">👥</span>這個群組還沒有成員<br><button class="btn" style="margin-top:14px" onclick="sbGoTab('settings')">${fi('user-plus',14)} 到設定新增成員</button></div>`;
@@ -1609,15 +1616,27 @@ function sbRenderStats(){
   const allCurs=sbAllCurrencies();
   const multiCur=allCurs.length>1;
   const money=(c,v)=>esc(c)+' '+Math.round(v).toLocaleString();
-  const tagHtml=(cur,first)=>multiCur?`<div style="display:flex;align-items:center;gap:8px;margin:${first?'6px':'22px'} 0 4px"><div style="flex:1;height:1.5px;background:#c09060;opacity:.3"></div><span style="font-size:11px;font-weight:800;color:#7a4f2e;letter-spacing:.08em;background:#ede0d0;padding:2px 10px;border-radius:999px">${esc(cur)}</span><div style="flex:1;height:1.5px;background:#c09060;opacity:.3"></div></div>`:'';
+  const CUR_NAME={'NT$':'新台幣','JPY':'日圓','¥':'日圓','$':'美元','USD':'美元','€':'歐元','HK$':'港幣','KRW':'韓元'};
+  // 柔和配色：[文字/重點色, 標題列底色, 區塊底色, 外框色]
+  const CUR_TONES=[['#4e7f7c','#e4efee','#f5f9f9','#d3e3e1'],['#94684a','#f3ebe3','#fbf8f5','#e8dccf'],['#6d6699','#ebe9f3','#f8f7fb','#dedbec'],['#4f6f90','#e5ecf3','#f6f8fb','#d5e0eb'],['#8f5d6a','#f3e7ea','#fbf7f8','#e9d6db']];
+  const tone=cur=>CUR_TONES[allCurs.indexOf(cur)%CUR_TONES.length]||CUR_TONES[0];
+  if(multiCur) h+=`<div style="display:flex;gap:8px;justify-content:center;margin:2px 0 10px;flex-wrap:wrap">${allCurs.map((c,i)=>{ const t=CUR_TONES[i%CUR_TONES.length]; const gg=groups.find(x=>x.cur===c); return `<button onclick="document.getElementById('cur-sec-${i}').scrollIntoView({behavior:'smooth',block:'start'})" style="border:1px solid ${t[3]};background:${t[1]};color:${t[0]};border-radius:999px;padding:5px 12px;font-size:12px;font-weight:800;font-family:inherit">${esc(c)} ${gg?Math.round(gg.total).toLocaleString():0}</button>`; }).join('')}</div>`;
+  // 多幣別時：每種幣別一個有顏色的區塊（標題列＋淡色底），一眼分得出來；上方的幣別按鈕可直接跳到該區塊
+  const tagHtml=(cur,g)=>{ if(!multiCur) return ''; const [c,hb,,bd]=tone(cur);
+    return `<div id="cur-sec-${allCurs.indexOf(cur)}" style="scroll-margin-top:96px;display:flex;align-items:center;gap:10px;background:${hb};color:${c};border:1px solid ${bd};border-bottom:none;border-radius:14px 14px 0 0;padding:10px 14px;margin-top:4px">
+      <span style="font-size:13px;font-weight:900;background:#fff;border:1px solid ${bd};padding:2px 10px;border-radius:999px;letter-spacing:.04em">${esc(cur)}</span>
+      <span style="font-size:14px;font-weight:900">${esc(CUR_NAME[cur]||cur)}支出</span>
+      <span style="margin-left:auto;text-align:right"><span style="display:block;font-size:10px;opacity:.75">${esc(label)}合計</span><span style="font-size:16px;font-weight:900">${g?Math.round(g.total).toLocaleString():0}</span></span>
+    </div>`; };
   // 依幣別分開：每種幣別都有「近 6 個月趨勢」＋類別分布＋成員支出
   const curOrder=[...new Set([...groups.map(g=>g.cur),...allCurs])];
   h+=curOrder.map((cur,gi)=>{
     const g=groups.find(x=>x.cur===cur);
-    let out=tagHtml(cur,gi===0);
+    const [tc,,tbg,tbd]=tone(cur);
+    let out=tagHtml(cur,g)+(multiCur?`<div style="--tc:${tc};background:${tbg};border:1px solid ${tbd};border-top:none;border-radius:0 0 14px 14px;padding:2px 10px 10px;margin-bottom:22px">`:'');
     out+=`<div class="sec-title">${fi('bar-chart-2',13)} 近 6 個月趨勢${multiCur?'':`<span style="font-size:11px;color:var(--text-muted);font-weight:700">（${esc(cur)}）</span>`}</div>
       <div class="card" style="padding:4px 12px 10px;background:#fff">${renderTrend(cur)}</div>`;
-    if(!g){ out+=`<div class="card" style="padding:16px;background:#fff;text-align:center;color:var(--text-muted);font-size:12px">${esc(label)}沒有 ${esc(cur)} 的支出</div>`; return out; }
+    if(!g){ out+=`<div class="card" style="padding:16px;background:#fff;text-align:center;color:var(--text-muted);font-size:12px">${esc(label)}沒有 ${esc(cur)} 的支出</div>`; return out+(multiCur?'</div>':''); }
     const cats=Object.keys(g.cats).sort((a,b)=>g.cats[b]-g.cats[a]);
     const R=42, C=2*Math.PI*R; let off=0;
     const arcs=cats.map(k=>{ const frac=g.total?g.cats[k]/g.total:0, len=frac*C; const seg=`<circle cx="60" cy="60" r="${R}" fill="none" stroke="${SBCAT[k].color}" stroke-width="16" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off}"/>`; off+=len; return seg; }).join('');
@@ -1650,7 +1669,7 @@ function sbRenderStats(){
       <div class="card" style="padding:12px 14px;background:#fff;display:flex;align-items:center;gap:14px">${donut}<div style="flex:1;min-width:0">${legend}</div></div>
       <div class="sec-title">${fi('users',13)} 成員支出</div>
       <div class="card" style="padding:4px 14px;background:#fff">${memRows||'<div class="empty" style="padding:16px 10px">尚無資料</div>'}</div>`;
-    return out;
+    return out+(multiCur?'</div>':'');
   }).join('');
   h+=`<p style="font-size:11px;color:var(--text-muted);margin:10px 2px 0;line-height:1.6">成員金額為各自應分攤的花費；轉帳（已完成的付款）不計入統計。點趨勢圖的月份可切換；點類別可查看該月份、該類別的紀錄。</p>`;
   return h;
